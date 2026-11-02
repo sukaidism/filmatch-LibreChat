@@ -80,6 +80,7 @@ librechat.yaml
 librechat.yml
 
 # Environment
+/test-results/
 .env*
 my.secrets
 !**/.env.example

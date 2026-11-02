@@ -9,6 +9,7 @@ let mockConversation: Record<string, unknown> | null = null;
 let mockAgentsMap: Record<string, any> | undefined;
 let mockAssistantMap: Record<string, any> | undefined;
 let mockInterfaceConfig: Record<string, unknown> = {};
+let mockAppTitle = 'LibreChat';
 
 jest.mock('@react-spring/web', () => ({
   easings: {
@@ -37,7 +38,7 @@ jest.mock('~/Providers', () => ({
 }));
 
 jest.mock('~/data-provider', () => ({
-  useGetStartupConfig: () => ({ data: { interface: mockInterfaceConfig } }),
+  useGetStartupConfig: () => ({ data: { appTitle: mockAppTitle, interface: mockInterfaceConfig } }),
   useGetEndpointsQuery: () => ({ data: {} }),
 }));
 
@@ -269,5 +270,36 @@ describe('Landing heading', () => {
 
     expect(screen.getByText('Hello there')).toBeInTheDocument();
     expect(screen.queryByText('Data Analyst')).not.toBeInTheDocument();
+  });
+});
+
+describe('Filmatch welcome', () => {
+  beforeEach(() => {
+    mockAppTitle = 'Filmatch';
+    mockInterfaceConfig = {
+      customWelcome: 'Matcha, merienda, and a moment to slow down.',
+    };
+    mockConversation = { endpoint: 'google' };
+    mockAgentsMap = undefined;
+    mockAssistantMap = undefined;
+  });
+
+  afterEach(() => {
+    mockAppTitle = 'LibreChat';
+  });
+
+  it('uses the configured café welcome without an animated provider identity', () => {
+    renderLanding();
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
+      'Matcha, merienda, and a moment to slow down.',
+    );
+    expect(screen.queryByTestId('convo-icon')).not.toBeInTheDocument();
+  });
+
+  it('preserves the temporary-chat explanation', () => {
+    renderLanding({ isTemporary: true });
+    expect(screen.getByText('Temporary Chat')).toBeInTheDocument();
+    expect(screen.getByText(/won't appear in your history/)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
   });
 });

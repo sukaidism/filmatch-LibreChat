@@ -11,6 +11,7 @@ import { useLocalize, useAuthContext, useGreeting } from '~/hooks';
 import { useChatSettings } from '~/Providers/ChatSettingsContext';
 import AgentContact from '~/components/Agents/AgentContact';
 import ConvoIcon from '~/components/Endpoints/ConvoIcon';
+import { isFilmatch } from '~/components/Filmatch/Brand';
 
 const containerClassName =
   'relative flex h-full items-center justify-center rounded-full bg-presentation text-text-primary';
@@ -136,6 +137,19 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
   const greetingText = isTemporary
     ? localize('com_ui_temporary')
     : (resolvedWelcome ?? scheduledGreeting);
+
+  if (isFilmatch(startupConfig) && !isTemporary) {
+    return (
+      <div className="flex w-full flex-col items-center px-6 pt-20 pb-8 text-center sm:pt-8">
+        <h2 className="text-text-primary max-w-md text-2xl leading-snug font-medium tracking-tight text-balance sm:text-3xl">
+          {resolvedWelcome ?? localize('com_ui_filmatch_welcome')}
+        </h2>
+        <p className="text-text-secondary mt-4 max-w-sm text-sm leading-relaxed text-balance">
+          {localize('com_ui_filmatch_intro')}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div

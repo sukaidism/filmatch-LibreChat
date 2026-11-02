@@ -77,6 +77,7 @@ import AskUserQuestionPopover from './AskUserQuestionPopover';
 import useComposerItems from '~/hooks/Input/useComposerItems';
 import useAttachTarget from '~/hooks/Input/useAttachTarget';
 import { chatDirectionAtom } from '~/store/chatDirection';
+import { isFilmatch } from '~/components/Filmatch/Brand';
 import ProjectLandingChip from '../ProjectLandingChip';
 import useHasAccess from '~/hooks/Roles/useHasAccess';
 import useDictation from '~/hooks/Input/useDictation';
@@ -474,7 +475,10 @@ const ChatForm = memo(function ChatForm({
     /* Only picks the missing-key placeholder; preparation and answer holds live on the textarea. */
     disabled: disableInputs,
     // The composer IS the free-form answer box while a question pause is live.
-    placeholder: composerReserved ? answerPlaceholder : placeholder,
+    placeholder: composerReserved
+      ? answerPlaceholder
+      : (placeholder ??
+        (isFilmatch(startupConfig) ? localize('com_ui_filmatch_placeholder') : undefined)),
     // Enter stays live during a run when it can steer/queue instead of send.
     allowSubmitWhileGenerating: steering.duringRunActive || answerMode.composerAnswers,
     onDuringRunModifier: steering.duringRunActive ? handleDuringRunModifier : undefined,

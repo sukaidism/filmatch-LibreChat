@@ -28,6 +28,7 @@ const policies = {
 };
 
 type Options = {
+  appTitle?: string;
   pathname?: string;
   isFetching?: boolean;
   startupConfigError?: unknown;
@@ -42,6 +43,7 @@ type Options = {
 };
 
 function setup({
+  appTitle = 'LibreChat',
   pathname = 'register',
   isFetching = false,
   startupConfigError = null,
@@ -51,7 +53,7 @@ function setup({
   interfaceConfig,
 }: Options) {
   const startupConfig = {
-    appTitle: 'LibreChat',
+    appTitle,
     socialLoginEnabled,
     socialLogins: providers ?? (socialLoginEnabled ? ['google'] : []),
     googleLoginEnabled: googleLoginEnabled ?? socialLoginEnabled,
@@ -86,6 +88,25 @@ function setup({
 
 const consent = () => screen.queryByText(/By continuing/i);
 const footerBar = () => document.querySelector('[role="contentinfo"]');
+
+describe('Filmatch authentication identity', () => {
+  test('retains the form, policies and LibreChat credit with café branding', () => {
+    setup({ appTitle: 'Filmatch', pathname: 'login', interfaceConfig: policies });
+    expect(screen.getByRole('heading', { name: 'Welcome to Filmatch' })).toBeVisible();
+    expect(screen.getByRole('form')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'LibreChat' })).toHaveAttribute(
+      'href',
+      'https://www.librechat.ai',
+    );
+    expect(consent()).toBeInTheDocument();
+  });
+
+  test('keeps the server failure visible instead of the welcome', () => {
+    setup({ appTitle: 'Filmatch', pathname: 'login', startupConfigError: new Error('offline') });
+    expect(screen.queryByRole('heading', { name: 'Welcome to Filmatch' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('alert').length).toBeGreaterThan(0);
+  });
+});
 
 describe('AuthLayout legal placement', () => {
   /** The registration form states the consent itself, under its own submit

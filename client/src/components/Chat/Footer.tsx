@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Constants, hasConfiguredFooter } from 'librechat-data-provider';
 import type { TStartupConfig } from 'librechat-data-provider';
+import { isFilmatch } from '~/components/Filmatch/Brand';
 import { useGetStartupConfig } from '~/data-provider';
 import { policyUrls } from '~/utils/policies';
 import { useLocalize } from '~/hooks';
@@ -18,7 +19,7 @@ type FooterProps = {
   configuredOnly?: boolean;
 };
 
-type FooterStartupConfig = Pick<Partial<TStartupConfig>, 'customFooter'> & {
+type FooterStartupConfig = Pick<Partial<TStartupConfig>, 'customFooter' | 'appTitle'> & {
   interface?: Pick<NonNullable<TStartupConfig['interface']>, 'privacyPolicy' | 'termsOfService'>;
 };
 
@@ -73,6 +74,7 @@ function Footer({ className, startupConfig, configuredOnly = false }: FooterProp
   const { data: fetchedConfig } = useGetStartupConfig({ enabled: shouldFetchConfig });
   const config = shouldFetchConfig ? fetchedConfig : startupConfig;
   const localize = useLocalize();
+  const cafe = isFilmatch(config?.appTitle ? { appTitle: config.appTitle } : undefined);
 
   /** The same reading the consent and the auth footer use: a blank url is not
    *  a published policy. */
@@ -92,12 +94,13 @@ function Footer({ className, startupConfig, configuredOnly = false }: FooterProp
 
   const configuredFooter = typeof config?.customFooter === 'string' ? config.customFooter : null;
   /** The generic disclaimer is the part a conversation drops; the operator's own footer is not. */
-  const genericFooter = configuredOnly
-    ? ''
+  const defaultFooter = cafe
+    ? localize('com_ui_filmatch_footer')
     : '[LibreChat ' +
       Constants.VERSION +
       '](https://librechat.ai) - ' +
       localize('com_ui_latest_footer');
+  const genericFooter = configuredOnly ? '' : defaultFooter;
   const mainContent = configuredFooter ?? genericFooter;
   const mainContentParts = mainContent === '' ? [] : mainContent.split('|');
 
@@ -151,7 +154,9 @@ function Footer({ className, startupConfig, configuredOnly = false }: FooterProp
              rather than the brighter `text-secondary`: the underline carries the
              affordance, and a link that outshines its own sentence puts the
              emphasis back where this change takes it from. */
-          'text-text-muted absolute right-0 bottom-0 left-0 hidden items-center justify-center gap-2 px-2 py-2 text-center text-xs sm:flex md:px-15'
+          (cafe
+            ? 'text-text-muted flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-3 text-center text-xs'
+            : 'text-text-muted absolute right-0 bottom-0 left-0 hidden items-center justify-center gap-2 px-2 py-2 text-center text-xs sm:flex md:px-15')
         }
       >
         {footerElements.map((contentRender, index) => {

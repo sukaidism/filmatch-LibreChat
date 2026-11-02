@@ -11,6 +11,7 @@ import {
 } from 'librechat-data-provider';
 import { OpenSidebar, PresetsMenu, NewChat, HeaderMenu } from './Menus';
 import { TemporaryChat, TemporaryChatIndicator } from './TemporaryChat';
+import Brand, { isFilmatch } from '~/components/Filmatch/Brand';
 import useDrawerViewport from '~/hooks/Nav/useDrawerViewport';
 import ModelSelector from './Menus/Endpoints/ModelSelector';
 import { BackgroundTasksButton } from './BackgroundTasks';
@@ -38,6 +39,7 @@ function Header({
   readOnly?: boolean;
 }) {
   const { data: startupConfig } = useGetStartupConfig();
+  const cafe = isFilmatch(startupConfig);
   const navVisible = useRecoilValue(store.sidebarExpanded);
   const isSubmitting = useIsSubmitting(0);
   const isSmallScreen = useDrawerViewport();
@@ -110,16 +112,21 @@ function Header({
         {parentConversationId != null && (
           <SubagentThreadLink threadId={parentConversationId} labelClassName="hidden lg:inline" />
         )}
+        {cafe && (
+          <div className="hidden shrink-0 sm:block">
+            <Brand />
+          </div>
+        )}
         {!readOnly && <ModelSelector startupConfig={startupConfig} />}
         {!readOnly && interfaceConfig.presets === true && interfaceConfig.modelSelect === true && (
           <PresetsMenu />
         )}
-        {hasAccessToBookmarks === true && (
+        {!cafe && hasAccessToBookmarks === true && (
           <div className={cn('items-center', isSmallScreen ? 'hidden' : 'flex')}>
             <BookmarkMenu />
           </div>
         )}
-        {hasAccessToMultiConvo === true && (
+        {!cafe && hasAccessToMultiConvo === true && (
           <div className={cn('items-center', isSmallScreen ? 'hidden' : 'flex')}>
             <AddMultiConvo />
           </div>
@@ -146,9 +153,9 @@ function Header({
           trace={trace}
           readOnly={readOnly}
           pullRequestConversationId={showPullRequest ? routeConversationId : undefined}
-          className={isSmallScreen ? undefined : 'hidden'}
+          className={isSmallScreen || cafe ? undefined : 'hidden'}
         />
-        <div className={cn('items-center gap-2', isSmallScreen ? 'hidden' : 'flex')}>
+        <div className={cn('items-center gap-2', isSmallScreen || cafe ? 'hidden' : 'flex')}>
           {trace.show && <TraceButton onClick={trace.open} />}
           <ExportAndShareMenu
             isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false}

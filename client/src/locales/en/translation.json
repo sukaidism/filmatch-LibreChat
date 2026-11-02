@@ -3778,5 +3778,15 @@
   "com_ui_code_setup_approve": "Approve setup",
   "com_ui_code_setup_deny": "Deny setup",
   "com_ui_code_setup_saving": "Saving your decision…",
-  "com_ui_terms_accept_failed": "Could not accept the terms. Please try again."
+  "com_ui_terms_accept_failed": "Could not accept the terms. Please try again.",
+  "com_ui_filmatch_name": "Filmatch",
+  "com_ui_filmatch_welcome": "Matcha, merienda, and a moment to slow down.",
+  "com_ui_filmatch_intro": "Explore our matcha drinks and Filipino desserts. Ask Filmatch a question or start with one below.",
+  "com_ui_filmatch_login": "Welcome to Filmatch",
+  "com_ui_filmatch_login_description": "Sign in to ask about the café and pick up where you left off.",
+  "com_ui_filmatch_placeholder": "Ask about matcha, merienda, or the café…",
+  "com_ui_filmatch_demo": "A fictional café, created for a student project.",
+  "com_ui_filmatch_powered": "Built with",
+  "com_ui_filmatch_credits": "LibreChat",
+  "com_ui_filmatch_footer": "Fictional café · Information only | Built with [LibreChat](https://www.librechat.ai)"
 }

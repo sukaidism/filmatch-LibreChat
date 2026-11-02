@@ -1,5 +1,6 @@
 import { ThemeSelector } from '@librechat/client';
 import { TStartupConfig } from 'librechat-data-provider';
+import Brand, { Credits, isFilmatch } from '~/components/Filmatch/Brand';
 import { ErrorMessage } from '~/components/Auth/ErrorMessage';
 import { hasPublishedPolicies } from '~/utils/policies';
 import { TranslationKeys, useLocalize } from '~/hooks';
@@ -28,6 +29,7 @@ function AuthLayout({
   error: TranslationKeys | null;
 }) {
   const localize = useLocalize();
+  const cafe = isFilmatch(startupConfig);
 
   const hasStartupConfigError = startupConfigError !== null && startupConfigError !== undefined;
   const isRegister = pathname.includes('register');
@@ -91,16 +93,20 @@ function AuthLayout({
     <div className="bg-surface-primary relative flex min-h-screen flex-col">
       <Banner />
       <BlinkAnimation active={isFetching}>
-        <div className="mt-6 h-10 w-full bg-cover">
-          <img
-            src="assets/logo.svg"
-            className="h-full w-full object-contain"
-            alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'LibreChat' })}
-          />
+        <div className="mt-8 flex h-10 w-full items-center justify-center">
+          {cafe ? (
+            <Brand />
+          ) : (
+            <img
+              src="assets/logo.svg"
+              className="h-full w-full object-contain"
+              alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'LibreChat' })}
+            />
+          )}
         </div>
       </BlinkAnimation>
       <DisplayError />
-      <div className="absolute inset-s-0 bottom-0 md:m-4">
+      <div className={cn(cafe ? 'flex justify-center py-2' : 'absolute inset-s-0 bottom-0 md:m-4')}>
         <ThemeSelector />
       </div>
 
@@ -113,8 +119,13 @@ function AuthLayout({
         >
           {!hasStartupConfigError && !isFetching && header && (
             <h1 className="text-text-primary mb-4 text-center text-3xl font-semibold select-none">
-              {header}
+              {cafe && isLogin ? localize('com_ui_filmatch_login') : header}
             </h1>
+          )}
+          {cafe && isLogin && !hasStartupConfigError && !isFetching && (
+            <p className="text-text-secondary mx-auto mb-8 max-w-xs text-center text-sm leading-relaxed">
+              {localize('com_ui_filmatch_login_description')}
+            </p>
           )}
           {children}
           {showsSocialLogin && (
@@ -124,6 +135,7 @@ function AuthLayout({
         </div>
       </main>
       {!statesConsent && <Footer startupConfig={startupConfig} />}
+      {cafe && <Credits />}
     </div>
   );
 }

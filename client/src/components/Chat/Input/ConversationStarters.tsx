@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from 'react';
+import { Button } from '@librechat/client';
 import { EModelEndpoint, Constants } from 'librechat-data-provider';
 import {
   useGetAssistantDocsQuery,
@@ -7,6 +8,7 @@ import {
 } from '~/data-provider';
 import { useChatContext, useAgentsMapContext, useAssistantsMapContext } from '~/Providers';
 import { getIconEndpoint, getEntity, getModelSpec } from '~/utils';
+import { isFilmatch } from '~/components/Filmatch/Brand';
 import { useSubmitMessage } from '~/hooks';
 
 const ConversationStarters = () => {
@@ -69,6 +71,25 @@ const ConversationStarters = () => {
 
   if (!conversation_starters.length) {
     return null;
+  }
+
+  if (isFilmatch(startupConfig)) {
+    return (
+      <div className="mx-auto mb-6 grid w-full max-w-xl grid-cols-2 gap-3 px-4 sm:px-6">
+        {conversation_starters.slice(0, 4).map((text) => (
+          <Button
+            key={text}
+            variant="outline"
+            size="row"
+            shape="theme"
+            className="min-h-14 text-start whitespace-normal"
+            onClick={() => sendConversationStarter(text)}
+          >
+            {text}
+          </Button>
+        ))}
+      </div>
+    );
   }
 
   return (
