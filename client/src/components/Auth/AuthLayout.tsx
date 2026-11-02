@@ -107,7 +107,7 @@ function AuthLayout({
       </BlinkAnimation>
       <DisplayError />
       <div className={cn(cafe ? 'flex justify-center py-2' : 'absolute inset-s-0 bottom-0 md:m-4')}>
-        <ThemeSelector />
+        <ThemeSelector placement={cafe ? 'inline' : 'floating'} />
       </div>
 
       <main className="flex grow items-center justify-center">

@@ -140,6 +140,18 @@ describe('ThemeSelector scheme toggle', () => {
 /** The auth routes render this selector alone, so contrast has to be reachable
  *  from it — the scheme toggle preserves a contrast choice but never makes one. */
 describe('ThemeSelector contrast toggle', () => {
+  it('keeps both appearance controls usable in an inline layout', () => {
+    const setTheme = jest.fn();
+    renderWith('dark', false, setTheme, <ThemeSelector placement="inline" />);
+    const scheme = screen.getByRole('button', { name: 'com_ui_toggle_theme' });
+    const contrast = screen.getByRole('button', { name: 'com_ui_toggle_high_contrast' });
+    expect(scheme.parentElement).not.toHaveClass('absolute');
+    fireEvent.click(scheme);
+    fireEvent.click(contrast);
+    expect(setTheme).toHaveBeenNthCalledWith(1, 'light');
+    expect(setTheme).toHaveBeenNthCalledWith(2, 'high-contrast-dark');
+  });
+
   it('turns contrast on for the scheme currently rendered', () => {
     const { setTheme } = renderAuthControls('dark');
     const toggle = screen.getByRole('button', { name: 'com_ui_toggle_high_contrast' });

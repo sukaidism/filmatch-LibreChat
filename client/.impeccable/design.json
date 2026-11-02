@@ -1,0 +1,526 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-02T23:20:29.185Z",
+  "title": "Design System: Filmatch",
+  "extensions": {
+    "colorMeta": {
+      "matcha": {
+        "role": "primary",
+        "displayName": "Matcha",
+        "canonical": "rgb(64 87 49)",
+        "tonalRamp": [
+          "oklch(15% 0.0165 133.89)",
+          "oklch(27% 0.0362 133.89)",
+          "oklch(39% 0.0560 133.89)",
+          "oklch(51% 0.0658 133.89)",
+          "oklch(63% 0.0658 133.89)",
+          "oklch(75% 0.0494 133.89)",
+          "oklch(87% 0.0296 133.89)",
+          "oklch(95% 0.0165 133.89)"
+        ]
+      },
+      "matcha-hover": {
+        "role": "primary",
+        "displayName": "Matcha Hover",
+        "canonical": "rgb(48 67 36)",
+        "tonalRamp": [
+          "oklch(15% 0.0141 134.16)",
+          "oklch(27% 0.0309 134.16)",
+          "oklch(39% 0.0478 134.16)",
+          "oklch(51% 0.0562 134.16)",
+          "oklch(63% 0.0562 134.16)",
+          "oklch(75% 0.0422 134.16)",
+          "oklch(87% 0.0253 134.16)",
+          "oklch(95% 0.0141 134.16)"
+        ]
+      },
+      "pale-matcha": {
+        "role": "primary",
+        "displayName": "Pale Matcha",
+        "canonical": "rgb(178 200 143)",
+        "tonalRamp": [
+          "oklch(15% 0.0201 125.31)",
+          "oklch(27% 0.0443 125.31)",
+          "oklch(39% 0.0685 125.31)",
+          "oklch(51% 0.0805 125.31)",
+          "oklch(63% 0.0805 125.31)",
+          "oklch(75% 0.0604 125.31)",
+          "oklch(87% 0.0362 125.31)",
+          "oklch(95% 0.0201 125.31)"
+        ]
+      },
+      "pale-matcha-hover": {
+        "role": "primary",
+        "displayName": "Pale Matcha Hover",
+        "canonical": "rgb(202 220 175)",
+        "tonalRamp": [
+          "oklch(15% 0.0158 125.42)",
+          "oklch(27% 0.0348 125.42)",
+          "oklch(39% 0.0537 125.42)",
+          "oklch(51% 0.0632 125.42)",
+          "oklch(63% 0.0632 125.42)",
+          "oklch(75% 0.0474 125.42)",
+          "oklch(87% 0.0284 125.42)",
+          "oklch(95% 0.0158 125.42)"
+        ]
+      },
+      "cream-canvas": {
+        "role": "neutral",
+        "displayName": "Cream Canvas",
+        "canonical": "rgb(249 246 237)",
+        "tonalRamp": [
+          "oklch(15% 0.0031 91.52)",
+          "oklch(27% 0.0068 91.52)",
+          "oklch(39% 0.0105 91.52)",
+          "oklch(51% 0.0123 91.52)",
+          "oklch(63% 0.0123 91.52)",
+          "oklch(75% 0.0092 91.52)",
+          "oklch(87% 0.0055 91.52)",
+          "oklch(95% 0.0031 91.52)"
+        ]
+      },
+      "cream-sidebar": {
+        "role": "neutral",
+        "displayName": "Cream Sidebar",
+        "canonical": "rgb(239 236 225)",
+        "tonalRamp": [
+          "oklch(15% 0.0037 94.20)",
+          "oklch(27% 0.0082 94.20)",
+          "oklch(39% 0.0127 94.20)",
+          "oklch(51% 0.0150 94.20)",
+          "oklch(63% 0.0150 94.20)",
+          "oklch(75% 0.0112 94.20)",
+          "oklch(87% 0.0067 94.20)",
+          "oklch(95% 0.0037 94.20)"
+        ]
+      },
+      "cream-panel": {
+        "role": "neutral",
+        "displayName": "Cream Panel",
+        "canonical": "rgb(255 253 247)",
+        "tonalRamp": [
+          "oklch(15% 0.0020 91.48)",
+          "oklch(27% 0.0045 91.48)",
+          "oklch(39% 0.0070 91.48)",
+          "oklch(51% 0.0082 91.48)",
+          "oklch(63% 0.0082 91.48)",
+          "oklch(75% 0.0061 91.48)",
+          "oklch(87% 0.0037 91.48)",
+          "oklch(95% 0.0020 91.48)"
+        ]
+      },
+      "cream-secondary": {
+        "role": "neutral",
+        "displayName": "Cream Secondary",
+        "canonical": "rgb(239 235 222)",
+        "tonalRamp": [
+          "oklch(15% 0.0045 92.69)",
+          "oklch(27% 0.0098 92.69)",
+          "oklch(39% 0.0151 92.69)",
+          "oklch(51% 0.0178 92.69)",
+          "oklch(63% 0.0178 92.69)",
+          "oklch(75% 0.0134 92.69)",
+          "oklch(87% 0.0080 92.69)",
+          "oklch(95% 0.0045 92.69)"
+        ]
+      },
+      "cream-active": {
+        "role": "neutral",
+        "displayName": "Cream Active",
+        "canonical": "rgb(226 231 213)",
+        "tonalRamp": [
+          "oklch(15% 0.0061 119.52)",
+          "oklch(27% 0.0135 119.52)",
+          "oklch(39% 0.0209 119.52)",
+          "oklch(51% 0.0246 119.52)",
+          "oklch(63% 0.0246 119.52)",
+          "oklch(75% 0.0184 119.52)",
+          "oklch(87% 0.0111 119.52)",
+          "oklch(95% 0.0061 119.52)"
+        ]
+      },
+      "charcoal": {
+        "role": "neutral",
+        "displayName": "Charcoal",
+        "canonical": "rgb(35 43 33)",
+        "tonalRamp": [
+          "oklch(15% 0.0053 139.43)",
+          "oklch(27% 0.0117 139.43)",
+          "oklch(39% 0.0181 139.43)",
+          "oklch(51% 0.0212 139.43)",
+          "oklch(63% 0.0212 139.43)",
+          "oklch(75% 0.0159 139.43)",
+          "oklch(87% 0.0096 139.43)",
+          "oklch(95% 0.0053 139.43)"
+        ]
+      },
+      "olive-secondary": {
+        "role": "neutral",
+        "displayName": "Olive Secondary",
+        "canonical": "rgb(80 88 75)",
+        "tonalRamp": [
+          "oklch(15% 0.0058 133.30)",
+          "oklch(27% 0.0127 133.30)",
+          "oklch(39% 0.0196 133.30)",
+          "oklch(51% 0.0231 133.30)",
+          "oklch(63% 0.0231 133.30)",
+          "oklch(75% 0.0173 133.30)",
+          "oklch(87% 0.0104 133.30)",
+          "oklch(95% 0.0058 133.30)"
+        ]
+      },
+      "olive-muted": {
+        "role": "neutral",
+        "displayName": "Olive Muted",
+        "canonical": "rgb(94 103 83)",
+        "tonalRamp": [
+          "oklch(15% 0.0082 127.29)",
+          "oklch(27% 0.0180 127.29)",
+          "oklch(39% 0.0278 127.29)",
+          "oklch(51% 0.0328 127.29)",
+          "oklch(63% 0.0328 127.29)",
+          "oklch(75% 0.0246 127.29)",
+          "oklch(87% 0.0147 127.29)",
+          "oklch(95% 0.0082 127.29)"
+        ]
+      },
+      "light-border": {
+        "role": "neutral",
+        "displayName": "Light Border",
+        "canonical": "rgb(202 207 187)",
+        "tonalRamp": [
+          "oklch(15% 0.0069 118.41)",
+          "oklch(27% 0.0152 118.41)",
+          "oklch(39% 0.0236 118.41)",
+          "oklch(51% 0.0277 118.41)",
+          "oklch(63% 0.0277 118.41)",
+          "oklch(75% 0.0208 118.41)",
+          "oklch(87% 0.0125 118.41)",
+          "oklch(95% 0.0069 118.41)"
+        ]
+      },
+      "light-field-edge": {
+        "role": "neutral",
+        "displayName": "Light Field Edge",
+        "canonical": "rgb(125 135 113)",
+        "tonalRamp": [
+          "oklch(15% 0.0086 127.35)",
+          "oklch(27% 0.0189 127.35)",
+          "oklch(39% 0.0293 127.35)",
+          "oklch(51% 0.0344 127.35)",
+          "oklch(63% 0.0344 127.35)",
+          "oklch(75% 0.0258 127.35)",
+          "oklch(87% 0.0155 127.35)",
+          "oklch(95% 0.0086 127.35)"
+        ]
+      },
+      "green-canvas": {
+        "role": "neutral",
+        "displayName": "Green Canvas",
+        "canonical": "rgb(25 30 24)",
+        "tonalRamp": [
+          "oklch(15% 0.0034 140.44)",
+          "oklch(27% 0.0075 140.44)",
+          "oklch(39% 0.0116 140.44)",
+          "oklch(51% 0.0136 140.44)",
+          "oklch(63% 0.0136 140.44)",
+          "oklch(75% 0.0102 140.44)",
+          "oklch(87% 0.0061 140.44)",
+          "oklch(95% 0.0034 140.44)"
+        ]
+      },
+      "green-sidebar": {
+        "role": "neutral",
+        "displayName": "Green Sidebar",
+        "canonical": "rgb(21 27 21)",
+        "tonalRamp": [
+          "oklch(15% 0.0037 145.04)",
+          "oklch(27% 0.0081 145.04)",
+          "oklch(39% 0.0125 145.04)",
+          "oklch(51% 0.0147 145.04)",
+          "oklch(63% 0.0147 145.04)",
+          "oklch(75% 0.0110 145.04)",
+          "oklch(87% 0.0066 145.04)",
+          "oklch(95% 0.0037 145.04)"
+        ]
+      },
+      "green-panel": {
+        "role": "neutral",
+        "displayName": "Green Panel",
+        "canonical": "rgb(34 41 32)",
+        "tonalRamp": [
+          "oklch(15% 0.0048 138.76)",
+          "oklch(27% 0.0105 138.76)",
+          "oklch(39% 0.0162 138.76)",
+          "oklch(51% 0.0191 138.76)",
+          "oklch(63% 0.0191 138.76)",
+          "oklch(75% 0.0143 138.76)",
+          "oklch(87% 0.0086 138.76)",
+          "oklch(95% 0.0048 138.76)"
+        ]
+      },
+      "green-secondary": {
+        "role": "neutral",
+        "displayName": "Green Secondary",
+        "canonical": "rgb(39 47 36)",
+        "tonalRamp": [
+          "oklch(15% 0.0056 137.19)",
+          "oklch(27% 0.0123 137.19)",
+          "oklch(39% 0.0191 137.19)",
+          "oklch(51% 0.0224 137.19)",
+          "oklch(63% 0.0224 137.19)",
+          "oklch(75% 0.0168 137.19)",
+          "oklch(87% 0.0101 137.19)",
+          "oklch(95% 0.0056 137.19)"
+        ]
+      },
+      "green-active": {
+        "role": "neutral",
+        "displayName": "Green Active",
+        "canonical": "rgb(47 58 42)",
+        "tonalRamp": [
+          "oklch(15% 0.0078 136.00)",
+          "oklch(27% 0.0171 136.00)",
+          "oklch(39% 0.0264 136.00)",
+          "oklch(51% 0.0311 136.00)",
+          "oklch(63% 0.0311 136.00)",
+          "oklch(75% 0.0233 136.00)",
+          "oklch(87% 0.0140 136.00)",
+          "oklch(95% 0.0078 136.00)"
+        ]
+      },
+      "warm-white": {
+        "role": "neutral",
+        "displayName": "Warm White",
+        "canonical": "rgb(244 241 230)",
+        "tonalRamp": [
+          "oklch(15% 0.0037 94.20)",
+          "oklch(27% 0.0082 94.20)",
+          "oklch(39% 0.0127 94.20)",
+          "oklch(51% 0.0149 94.20)",
+          "oklch(63% 0.0149 94.20)",
+          "oklch(75% 0.0112 94.20)",
+          "oklch(87% 0.0067 94.20)",
+          "oklch(95% 0.0037 94.20)"
+        ]
+      },
+      "sage-secondary": {
+        "role": "neutral",
+        "displayName": "Sage Secondary",
+        "canonical": "rgb(190 197 180)",
+        "tonalRamp": [
+          "oklch(15% 0.0061 125.27)",
+          "oklch(27% 0.0135 125.27)",
+          "oklch(39% 0.0209 125.27)",
+          "oklch(51% 0.0246 125.27)",
+          "oklch(63% 0.0246 125.27)",
+          "oklch(75% 0.0184 125.27)",
+          "oklch(87% 0.0111 125.27)",
+          "oklch(95% 0.0061 125.27)"
+        ]
+      },
+      "sage-muted": {
+        "role": "neutral",
+        "displayName": "Sage Muted",
+        "canonical": "rgb(184 194 173)",
+        "tonalRamp": [
+          "oklch(15% 0.0077 127.97)",
+          "oklch(27% 0.0170 127.97)",
+          "oklch(39% 0.0263 127.97)",
+          "oklch(51% 0.0310 127.97)",
+          "oklch(63% 0.0310 127.97)",
+          "oklch(75% 0.0232 127.97)",
+          "oklch(87% 0.0139 127.97)",
+          "oklch(95% 0.0077 127.97)"
+        ]
+      },
+      "dark-border": {
+        "role": "neutral",
+        "displayName": "Dark Border",
+        "canonical": "rgb(66 77 59)",
+        "tonalRamp": [
+          "oklch(15% 0.0081 133.38)",
+          "oklch(27% 0.0179 133.38)",
+          "oklch(39% 0.0277 133.38)",
+          "oklch(51% 0.0325 133.38)",
+          "oklch(63% 0.0325 133.38)",
+          "oklch(75% 0.0244 133.38)",
+          "oklch(87% 0.0146 133.38)",
+          "oklch(95% 0.0081 133.38)"
+        ]
+      },
+      "dark-field-edge": {
+        "role": "neutral",
+        "displayName": "Dark Field Edge",
+        "canonical": "rgb(123 139 109)",
+        "tonalRamp": [
+          "oklch(15% 0.0119 130.60)",
+          "oklch(27% 0.0262 130.60)",
+          "oklch(39% 0.0405 130.60)",
+          "oklch(51% 0.0477 130.60)",
+          "oklch(63% 0.0477 130.60)",
+          "oklch(75% 0.0358 130.60)",
+          "oklch(87% 0.0215 130.60)",
+          "oklch(95% 0.0119 130.60)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Café welcome",
+        "purpose": "Medium responsive welcome; mobile uses headline-mobile."
+      },
+      "wordmark": {
+        "displayName": "Text identity",
+        "purpose": "Filmatch identity until final logo artwork exists."
+      }
+    },
+    "shadows": [
+      {
+        "name": "ambient-surface",
+        "value": "0 4px 20px rgba(25, 40, 25, 0.06)",
+        "purpose": "Configured elevationSurface; not the explicit composer shadow."
+      },
+      {
+        "name": "composer-rest",
+        "value": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+        "purpose": "Inherited shared medium shadow used by the composer at rest."
+      },
+      {
+        "name": "composer-focus",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        "purpose": "Inherited shared large shadow used by the focused composer."
+      }
+    ],
+    "motion": [
+      {
+        "name": "fast",
+        "value": "120ms",
+        "purpose": "Configured shared control transitions."
+      },
+      {
+        "name": "normal",
+        "value": "180ms",
+        "purpose": "Configured normal shared transitions."
+      },
+      {
+        "name": "composer-and-floating-label",
+        "value": "200ms",
+        "purpose": "Existing local timing; honor reduced motion."
+      },
+      {
+        "name": "composer-layout",
+        "value": "300ms",
+        "purpose": "Existing width and margin changes; disabled for reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary auth action",
+      "kind": "button",
+      "description": "Shared default button with auth sizing and soft shape.",
+      "html": "<button type=\"button\" class=\"ds-primary\">Continue</button>",
+      "css": ".ds-primary{font-family:var(--theme-font-family,Inter,ui-sans-serif,system-ui,sans-serif);font-size:.875rem;line-height:1.428571;font-weight:500;cursor:pointer;transition:background-color var(--theme-motion-fast,120ms),color var(--theme-motion-fast,120ms);height:var(--theme-auth-button-height,3rem);padding:0 var(--theme-button-padding-x,1rem);border:0;border-radius:var(--theme-auth-control-radius,.75rem);background:rgb(var(--button-primary,64 87 49));color:rgb(var(--text-inverted,255 253 247))}.ds-primary:hover{background:rgb(var(--button-primary-hover,48 67 36))}.ds-primary:active{background:rgb(var(--surface-inverted-pressed,48 67 36))}.ds-primary:focus-visible{outline:2px solid rgb(var(--focus-control,64 87 49));outline-offset:2px;}.ds-primary:disabled{opacity:.5;pointer-events:none}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}",
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "Suggested question",
+      "kind": "button",
+      "description": "Outlined café question with wrapping text and semantic hover fill.",
+      "html": "<button type=\"button\" class=\"ds-question\">How can I customise my drink?</button>",
+      "css": ".ds-question{font-family:var(--theme-font-family,Inter,ui-sans-serif,system-ui,sans-serif);font-size:.875rem;line-height:1.428571;font-weight:500;cursor:pointer;transition:background-color var(--theme-motion-fast,120ms),color var(--theme-motion-fast,120ms);min-height:3.5rem;padding:.75rem .875rem;border:1px solid rgb(var(--border-light,202 207 187));border-radius:var(--theme-control-radius,.75rem);background:transparent;color:rgb(var(--text-primary,35 43 33));white-space:normal}.ds-question:hover{background:rgb(var(--surface-hover,226 231 213))}.ds-question:active{background:rgb(var(--surface-pressed,226 231 213))}.ds-question:focus-visible{outline:2px solid rgb(var(--focus-control,64 87 49));outline-offset:2px;}@media(prefers-reduced-motion:reduce){.ds-question{transition:none}}",
+      "refersTo": "question-button"
+    },
+    {
+      "name": "Quiet appearance control",
+      "kind": "button",
+      "description": "Ghost icon button used in the inline auth appearance group.",
+      "html": "<button type=\"button\" class=\"ds-appearance\" aria-label=\"Toggle theme\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42\"/></svg></button>",
+      "css": ".ds-appearance{font-family:var(--theme-font-family,Inter,ui-sans-serif,system-ui,sans-serif);font-size:.875rem;line-height:1.428571;font-weight:500;cursor:pointer;transition:background-color var(--theme-motion-fast,120ms),color var(--theme-motion-fast,120ms);display:inline-flex;align-items:center;justify-content:center;padding:.5rem;border:0;border-radius:var(--theme-radius-lg,.5rem);background:transparent;color:rgb(var(--text-primary,35 43 33))}.ds-appearance:hover{background:rgb(var(--surface-hover,226 231 213))}.ds-appearance:active{background:rgb(var(--surface-pressed,226 231 213))}.ds-appearance:focus-visible{outline:2px solid rgb(var(--focus-control,64 87 49));outline-offset:2px;}@media(prefers-reduced-motion:reduce){.ds-appearance{transition:none}}"
+    },
+    {
+      "name": "Floating auth field",
+      "kind": "input",
+      "description": "Existing floating-label input with accent focus and auth metrics.",
+      "html": "<div class=\"ds-field\"><input class=\"ds-auth-input\" id=\"ds-email\" type=\"email\" placeholder=\" \"><label class=\"ds-label\" for=\"ds-email\">Email address</label></div>",
+      "css": ".ds-field{position:relative;width:100%;max-width:322px;font-family:var(--theme-font-family,Inter,ui-sans-serif,system-ui,sans-serif);font-size:.875rem;line-height:1.428571;}.ds-auth-input{font-family:var(--theme-font-family,Inter,ui-sans-serif,system-ui,sans-serif);font-size:.875rem;line-height:1.428571;height:var(--theme-auth-field-height,3rem);width:100%;box-sizing:border-box;padding:.125rem .875rem 0;border:1px solid rgb(var(--border-control,202 207 187));border-radius:var(--theme-auth-control-radius,.75rem);background:transparent;color:rgb(var(--text-primary,35 43 33))}.ds-label{position:absolute;left:.75rem;top:.375rem;padding:0 .5rem;transform:translateY(-1rem) scale(.75);transform-origin:0;background:rgb(var(--surface-primary,249 246 237));color:rgb(var(--text-secondary-alt,94 103 83));transition:transform 200ms,top 200ms}.ds-auth-input:placeholder-shown:not(:focus)+.ds-label{top:50%;transform:translateY(-50%) scale(1)}.ds-auth-input:focus{border-color:rgb(var(--accent-primary,64 87 49))}.ds-auth-input:focus-visible{outline:2px solid rgb(var(--focus-control,64 87 49));outline-offset:2px;}.ds-auth-input:focus+.ds-label{color:rgb(var(--accent-primary,64 87 49))}.ds-auth-input:disabled{opacity:.5;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.ds-label{transition:none}}",
+      "refersTo": "auth-field"
+    },
+    {
+      "name": "Navigation row",
+      "kind": "nav",
+      "description": "Shared quiet navigation with explicit selected fill.",
+      "html": "<nav aria-label=\"Conversation navigation\"><button type=\"button\" class=\"ds-nav\" aria-pressed=\"true\">Chats</button></nav>",
+      "css": ".ds-nav{font-family:var(--theme-font-family,Inter,ui-sans-serif,system-ui,sans-serif);font-size:.875rem;line-height:1.428571;font-weight:500;cursor:pointer;transition:background-color var(--theme-motion-fast,120ms),color var(--theme-motion-fast,120ms);display:flex;align-items:center;width:100%;padding:.75rem .875rem;border:0;border-radius:var(--theme-radius-lg,.5rem);text-align:left;background:transparent;color:rgb(var(--text-secondary,80 88 75))}.ds-nav:hover{background:rgb(var(--surface-nav-hover,226 231 213));color:rgb(var(--text-primary,35 43 33))}.ds-nav[aria-pressed=true]{background:rgb(var(--surface-nav-selected,226 231 213));color:rgb(var(--text-primary,35 43 33))}.ds-nav:active{background:rgb(var(--surface-pressed,226 231 213))}.ds-nav:focus-visible{outline:2px solid rgb(var(--focus-control,64 87 49));outline-offset:2px;}@media(prefers-reduced-motion:reduce){.ds-nav{transition:none}}"
+    },
+    {
+      "name": "Composer surface",
+      "kind": "card",
+      "description": "Shared composer fill and focus-sensitive elevation; mobile rounds only upper corners.",
+      "html": "<div class=\"ds-composer\"><label class=\"ds-composer-label\" for=\"ds-message\">Ask Filmatch</label><textarea class=\"ds-message\" id=\"ds-message\" placeholder=\"Ask about matcha, merienda, or the café...\"></textarea></div>",
+      "css": ".ds-composer{padding:1rem 1.25rem;border:1px solid rgb(var(--border-light,202 207 187));border-radius:var(--theme-large-surface-radius,1.5rem) var(--theme-large-surface-radius,1.5rem) 0 0;background:rgb(var(--surface-composer,255 253 247));color:rgb(var(--text-primary,35 43 33));box-shadow:var(--theme-shadow-md,0 4px 6px -1px rgb(0 0 0 / .1),0 2px 4px -2px rgb(0 0 0 / .1));transition:box-shadow 200ms}.ds-composer:focus-within{box-shadow:var(--theme-shadow-lg,0 10px 15px -3px rgb(0 0 0 / .1),0 4px 6px -4px rgb(0 0 0 / .1))}.ds-composer-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.ds-message{font-family:var(--theme-font-family,Inter,ui-sans-serif,system-ui,sans-serif);font-size:1rem;line-height:1.5;display:block;width:100%;min-height:3rem;border:0;resize:vertical;background:transparent;color:inherit}.ds-message::placeholder{color:rgb(var(--text-secondary,80 88 75))}.ds-message:focus-visible{outline:none}@media(min-width:640px){.ds-composer{border-radius:var(--theme-large-surface-radius,1.5rem)}}@media(prefers-reduced-motion:reduce){.ds-composer{transition:none}}",
+      "refersTo": "composer"
+    },
+    {
+      "name": "Composer option pill",
+      "kind": "chip",
+      "description": "Shared bordered composer control with no internal elevation.",
+      "html": "<button type=\"button\" class=\"ds-pill\">Tools</button>",
+      "css": ".ds-pill{font-family:var(--theme-font-family,Inter,ui-sans-serif,system-ui,sans-serif);font-size:.875rem;line-height:1.428571;font-weight:500;cursor:pointer;transition:background-color var(--theme-motion-fast,120ms),color var(--theme-motion-fast,120ms);display:inline-flex;align-items:center;justify-content:center;height:var(--theme-control-height,2.25rem);gap:var(--theme-control-gap,.375rem);padding:0 .75rem;border:1px solid rgb(var(--border-medium,202 207 187));border-radius:var(--theme-round-control-radius,9999px);background:transparent;color:rgb(var(--text-primary,35 43 33))}.ds-pill:hover{background:rgb(var(--surface-hover,226 231 213))}.ds-pill:focus-visible{outline:2px solid rgb(var(--focus-control,64 87 49));outline-offset:2px;}@media(prefers-reduced-motion:reduce){.ds-pill{transition:none}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "A moment to slow down",
+    "overview": "Filmatch's café identity uses warm cream, deep matcha, and charcoal with an unembellished text wordmark. Generous space around a short welcome makes the existing conversation interface feel calm and approachable. Inter is self-hosted; the café identity does not depend on a separate display face, photography, or illustration.\n\nDark mode carries the same hierarchy into deep green neutrals with pale matcha actions. Shared LibreChat primitives retain their keyboard, focus, error, and disabled behavior. The fictional café notice and LibreChat attribution remain readable supporting information.",
+    "keyCharacteristics": [
+      "Warm neutral surfaces with green actions.",
+      "Clear Inter hierarchy and restrained text identity.",
+      "Soft control corners and a larger composer silhouette.",
+      "Tonal separation with modest, functional elevation."
+    ],
+    "rules": [
+      {
+        "name": "The Semantic Surface Rule",
+        "body": "Choose the existing semantic surface or text role in code; let the theme supply its light/dark value. The palette does not replace LibreChat's inherited status, categorical, or high-contrast colors.",
+        "section": "colors"
+      },
+      {
+        "name": "The Quiet Identity Rule",
+        "body": "Reuse the text wordmark and Inter hierarchy; preserve the clear distinction between identity, welcome, controls, and supporting copy.",
+        "section": "typography"
+      },
+      {
+        "name": "The Functional Lift Rule",
+        "body": "Keep elevation attached to existing surface and interaction roles; a question button remains an outlined control rather than a raised card.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** compose shared LibreChat primitives and semantic theme roles.",
+      "**Do** retain light/dark hierarchy, high-contrast controls, and visible keyboard focus.",
+      "**Do** let question labels and credits wrap at mobile widths.",
+      "**Do** keep fictional-context information and LibreChat attribution discoverable."
+    ],
+    "donts": [
+      "**Don't** turn every suggestion into a raised card.",
+      "**Don't** hard-code light-mode colors into a component that must follow the theme.",
+      "**Don't** overlay appearance controls on footer text.",
+      "**Don't** invent logo artwork or introduce a new display font without an approved identity change."
+    ]
+  }
+}

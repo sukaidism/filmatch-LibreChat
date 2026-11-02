@@ -6,6 +6,7 @@ import { ThemeContext, isDark, isHighContrast } from '../theme';
 import { MorphIcon } from './MorphIcon';
 import { useLocalize } from '../hooks';
 import { Button } from './Button';
+import { cn } from '../utils';
 
 declare global {
   interface Window {
@@ -123,7 +124,13 @@ const ContrastToggle = ({
   );
 };
 
-const ThemeSelector = ({ returnThemeOnly }: { returnThemeOnly?: boolean }): JSX.Element => {
+const ThemeSelector = ({
+  returnThemeOnly,
+  placement = 'floating',
+}: {
+  returnThemeOnly?: boolean;
+  placement?: 'floating' | 'inline';
+}): JSX.Element => {
   const { theme, highContrast, setTheme } = useContext(ThemeContext);
   const [announcement, setAnnouncement] = useState('');
   const localize = useLocalize();
@@ -175,7 +182,12 @@ const ThemeSelector = ({ returnThemeOnly }: { returnThemeOnly?: boolean }): JSX.
 
   return (
     <div className="bg-surface-primary flex flex-col items-center justify-center pt-6 sm:pt-0">
-      <div className="absolute inset-s-0 bottom-0 m-4 flex items-center">
+      <div
+        className={cn(
+          'flex items-center',
+          placement === 'floating' && 'absolute inset-s-0 bottom-0 m-4',
+        )}
+      >
         <Theme theme={theme} highContrast={highContrast} onChange={changeScheme} />
         <ContrastToggle theme={theme} highContrast={highContrast} onChange={changeContrast} />
       </div>

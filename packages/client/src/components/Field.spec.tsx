@@ -129,9 +129,14 @@ describe('field variants', () => {
     expect(screen.getByLabelText('key')).toHaveClass(...FLUSH);
   });
 
-  it('paints the floating label chip in the field fill when the theme fills fields', () => {
-    expect(floatingLabel).toContain('bg-surface-primary');
-    expect(floatingLabel).toContain('theme-field-fill:bg-field-fill');
+  it('keeps the floating label transparent at rest and paints the chip only when floated', () => {
+    expect(floatingLabel).toContain(' bg-transparent ');
+    expect(floatingLabel).toContain('peer-focus:bg-surface-primary');
+    expect(floatingLabel).toContain('peer-[:not(:placeholder-shown)]:bg-surface-primary');
+    expect(floatingLabel).toContain('theme-field-fill:peer-focus:bg-field-fill');
+    expect(floatingLabel).toContain(
+      'theme-field-fill:peer-[:not(:placeholder-shown)]:bg-field-fill',
+    );
   });
 
   it('flush and embedded variants drop the base field fill in every control that carries it', () => {
