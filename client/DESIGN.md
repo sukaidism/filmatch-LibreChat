@@ -124,7 +124,7 @@ components:
 
 **Creative North Star: "A moment to slow down"**
 
-Filmatch's café identity uses warm cream, deep matcha, and charcoal with an unembellished text wordmark. Generous space around a short welcome makes the existing conversation interface feel calm and approachable. Inter is self-hosted; the café identity does not depend on a separate display face, photography, or illustration.
+Filmatch's café identity uses warm cream, deep matcha, and charcoal with the supplied green-and-gold logo. Generous space around a short welcome makes the existing conversation interface feel calm and approachable. Inter is self-hosted; the café identity does not depend on a separate display face, photography, or illustration.
 
 Dark mode carries the same hierarchy into deep green neutrals with pale matcha actions. Shared LibreChat primitives retain their keyboard, focus, error, and disabled behavior. The fictional café notice and LibreChat attribution remain readable supporting information.
 
@@ -166,7 +166,7 @@ The frontmatter preserves the configured RGB notation; aliases with identical va
 
 - **Headline:** medium welcome, with the smaller mobile role below the small breakpoint; tightly tracked and balanced within a short measure.
 - **Auth Title:** semibold sign-in heading.
-- **Wordmark:** semibold accent text, used as identity until final logo artwork exists.
+- **Wordmark:** supplied logo with transparent light and dark variants, plus compact mark and text in the header.
 - **Body:** ordinary reading text and composer content.
 - **Supporting:** café introduction and auth description, with relaxed leading.
 - **Control:** shared button labels; short, sentence-case questions wrap when needed.

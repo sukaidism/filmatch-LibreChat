@@ -5,10 +5,34 @@ import { useLocalize } from '~/hooks';
 export const isFilmatch = (config?: Pick<TStartupConfig, 'appTitle'> | null) =>
   config?.appTitle === 'Filmatch';
 
-export default function Brand() {
+export default function Brand({ full = false }: { full?: boolean }) {
   const localize = useLocalize();
-  return (
-    <span className="text-accent-primary text-2xl font-semibold tracking-tight">
+  return full ? (
+    <>
+      <img
+        src="/assets/filmatch-logo-light.png"
+        alt={localize('com_ui_filmatch_name')}
+        className="h-36 w-36 object-contain dark:hidden"
+        width={144}
+        height={144}
+      />
+      <img
+        src="/assets/filmatch-logo-dark.png"
+        alt={localize('com_ui_filmatch_name')}
+        className="hidden h-36 w-36 object-contain dark:block"
+        width={144}
+        height={144}
+      />
+    </>
+  ) : (
+    <span className="text-accent-primary flex items-center gap-2 text-xl font-semibold tracking-tight">
+      <img
+        src="/assets/filmatch-mark-transparent.png"
+        alt=""
+        className="size-8 rounded-md"
+        width={32}
+        height={32}
+      />
       {localize('com_ui_filmatch_name')}
     </span>
   );

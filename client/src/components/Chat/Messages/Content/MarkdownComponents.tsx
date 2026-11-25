@@ -306,6 +306,33 @@ export const img: React.ElementType = memo(function MarkdownImage({
     return toAbsoluteFilePath(resolved, baseURL);
   }, [src, baseURL, attachmentsByName]);
 
+  if (src === '/assets/filmatch-menu.png') {
+    return <FilmatchMenuPreview src={src} alt={alt} />;
+  }
+
   return <img src={fixedSrc} alt={alt} title={title} className={className} style={style} />;
 });
 img.displayName = 'MarkdownImage';
+
+function FilmatchMenuPreview({ src, alt }: { src: string; alt?: string }) {
+  const localize = useLocalize();
+  return (
+    <a
+      href={src}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="not-prose text-link focus-visible:outline-focus-control inline-flex max-w-full flex-col items-start gap-2 rounded-md focus-visible:outline-2"
+    >
+      <img
+        src={src}
+        alt={alt || 'Filmatch menu'}
+        className="block h-auto max-h-[min(26rem,50dvh)] w-auto max-w-full rounded-md object-contain"
+        width={1545}
+        height={2000}
+      />
+      <span className="text-sm underline underline-offset-4">
+        {localize('com_ui_filmatch_menu_full_size')}
+      </span>
+    </a>
+  );
+}
