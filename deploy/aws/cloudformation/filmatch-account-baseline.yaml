@@ -23,6 +23,13 @@ Parameters:
     Default: 'true'
     AllowedValues: ['true', 'false']
     Description: Set false only if the account already has a multi-region trail.
+  CreateOperatorsGroup:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: >
+      Set false in sandbox/organisation accounts (e.g. Skill Builder) whose service control
+      policy denies iam:CreateGroup. Team access is then managed outside this account.
   EnableGuardDuty:
     Type: String
     Default: 'false'
@@ -34,6 +41,7 @@ Parameters:
 Conditions:
   DoTrail: !Equals [!Ref CreateCloudTrail, 'true']
   DoGuardDuty: !Equals [!Ref EnableGuardDuty, 'true']
+  DoOperatorsGroup: !Equals [!Ref CreateOperatorsGroup, 'true']
 
 Resources:
   # ---------------------------------------------------------------- IAM: people
@@ -41,6 +49,7 @@ Resources:
   # this group. Until they register an MFA device they can do nothing except set up MFA.
   OperatorsGroup:
     Type: AWS::IAM::Group
+    Condition: DoOperatorsGroup
     Properties:
       GroupName: !Sub '${ProjectName}-operators'
       ManagedPolicyArns:
@@ -222,6 +231,7 @@ Resources:
 
 Outputs:
   OperatorsGroupName:
+    Condition: DoOperatorsGroup
     Value: !Ref OperatorsGroup
     Description: Add every team member's IAM user to this group.
   AdminRoleArn:

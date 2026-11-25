@@ -27,7 +27,7 @@ Prerequisites: AWS CLI v2, Git Bash, and an AWS identity that can create IAM res
 ALERT_EMAIL=team-inbox@example.com BUDGET_USD=25 bash deploy/aws/bin/deploy-stack.sh baseline
 ```
 
-If the account already has a multi-region trail, add `CREATE_TRAIL=false`. For the stretch item, add `ENABLE_GUARDDUTY=true`.
+If the account already has a multi-region trail, add `CREATE_TRAIL=false`. For the stretch item, add `ENABLE_GUARDDUTY=true`. If the stack fails with `iam:CreateGroup ... explicit deny in a service control policy` (sandbox accounts such as AWS Skill Builder), add `CREATE_OPERATORS_GROUP=false`; team logins and MFA are then managed by the organisation that owns the account.
 
 Then, **in the console, for each team member**:
 

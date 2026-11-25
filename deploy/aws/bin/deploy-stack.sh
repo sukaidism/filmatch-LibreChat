@@ -5,6 +5,7 @@
 #   ALERT_EMAIL=you@example.com GITHUB_REPO=owner/repo bash deploy/aws/bin/deploy-stack.sh app
 #
 # Optional: TEAM (tag), INSTANCE_TYPE, BUDGET_USD, CREATE_TRAIL=false, ENABLE_GUARDDUTY=true,
+#           CREATE_OPERATORS_GROUP=false (if an organisation SCP denies iam:CreateGroup),
 #           CREATE_OIDC=false (if the GitHub OIDC provider already exists in the account)
 source "$(dirname "$0")/common.sh"
 
@@ -24,7 +25,8 @@ baseline)
     --parameter-overrides \
       ProjectName="$PROJECT" AlertEmail="$ALERT_EMAIL" \
       MonthlyBudgetUSD="${BUDGET_USD:-25}" \
-      CreateCloudTrail="${CREATE_TRAIL:-true}" EnableGuardDuty="${ENABLE_GUARDDUTY:-false}"
+      CreateCloudTrail="${CREATE_TRAIL:-true}" EnableGuardDuty="${ENABLE_GUARDDUTY:-false}" \
+      CreateOperatorsGroup="${CREATE_OPERATORS_GROUP:-true}"
   aws cloudformation describe-stacks --stack-name "$BASELINE_STACK" --query 'Stacks[0].Outputs' --output table
   ;;
 app)
