@@ -89,6 +89,14 @@ describe('markdown img', () => {
     );
   });
 
+  it('renders the Filmatch menu as a compact preview linking to its original', () => {
+    const image = renderImage('/assets/filmatch-menu.png');
+    expect(image).toHaveAttribute('src', '/assets/filmatch-menu.png');
+    expect(image).toHaveClass('max-h-[min(26rem,50dvh)]', 'max-w-full');
+    expect(image?.closest('a')).toHaveAttribute('href', '/assets/filmatch-menu.png');
+    expect(image?.closest('a')).toHaveAttribute('target', '_blank');
+  });
+
   it('renders unchanged with no media context at all', () => {
     const { container } = render(<MarkdownImage src="5_dti.png" alt="DTI" />);
     expect(container.querySelector('img')).toHaveAttribute('src', '5_dti.png');

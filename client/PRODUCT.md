@@ -31,16 +31,14 @@ and Gemini connectivity. Preserve these workflows and the existing model configu
 
 ## Brand Commitments
 
-The product is Filmatch; the assistant is Ask Filmatch. Use a simple text wordmark until
-the final logo is available. The confirmed welcome is “Matcha, merienda, and a moment to
+The product is Filmatch; the assistant is Ask Filmatch. Use the supplied green-and-gold logo, with transparent backgrounds and a lighter wordmark in dark mode. The confirmed welcome is “Matcha, merienda, and a moment to
 slow down.” The interface is restrained and contemporary, with warm cream, deep matcha
 green, charcoal text, generous spacing, and clear typography in light and dark modes.
 
 ## Evidence on Hand
 
 `../librechat.filmatch.yaml` contains the configured assistant, café knowledge snapshot,
-language policy, and theme. The café and customer scenarios are fictional. Final logo
-artwork has not been supplied.
+language policy, and theme. The café and customer scenarios are fictional. The supplied logo artwork is stored at the repository root.
 
 ## Product Principles
 
