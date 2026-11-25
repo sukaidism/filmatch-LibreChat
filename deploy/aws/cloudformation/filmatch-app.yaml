@@ -992,7 +992,16 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubRepo}:ref:refs/heads/main'
+              # GitHub sends either the classic subject (repo:owner/repo:ref:...) or the newer
+              # immutable form (repo:owner@<id>/repo@<id>:ref:...). Both are pinned to this
+              # owner, this repository and the main branch; GitHub names cannot contain '@'.
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - !Sub 'repo:${GitHubRepo}:ref:refs/heads/main'
+                  - !Sub
+                    - 'repo:${Owner}@*/${Repo}@*:ref:refs/heads/main'
+                    - Owner: !Select [0, !Split ['/', !Ref GitHubRepo]]
+                      Repo: !Select [1, !Split ['/', !Ref GitHubRepo]]
       Policies:
         - PolicyName: build-and-deploy
           PolicyDocument:
