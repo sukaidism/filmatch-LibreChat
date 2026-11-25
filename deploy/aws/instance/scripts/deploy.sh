@@ -29,8 +29,10 @@ aws s3 sync --only-show-errors "s3://$CONTENT_BUCKET/knowledge/" "$stage/knowled
 doc_count=$(find "$stage/knowledge" -name '*.md' | wc -l)
 [ "$doc_count" -ge 5 ] || die "expected 5 knowledge documents in s3://$CONTENT_BUCKET/knowledge/, found $doc_count - NOT deploying stale content"
 log "fetched config + $doc_count knowledge documents from s3://$CONTENT_BUCKET"
+# Informational only (evidence of which S3 version is served) - never block a deploy on it.
 aws s3api list-object-versions --bucket "$CONTENT_BUCKET" --prefix knowledge/ \
-  --query 'Versions[?IsLatest].[Key,VersionId,LastModified]' --output text | sed 's/^/  s3 /'
+  --query 'Versions[?IsLatest].[Key,VersionId,LastModified]' --output text 2>/dev/null | sed 's/^/  s3 /' ||
+  log "could not list S3 object versions (continuing)"
 
 staging=$FILMATCH_ROOT/config/staging
 mkdir -p "$staging"

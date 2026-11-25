@@ -304,7 +304,8 @@ Resources:
                 Resource: '*'
               - Sid: ListContent
                 Effect: Allow
-                Action: s3:ListBucket
+                # ListBucketVersions: deploy.sh logs which S3 version of each document it serves.
+                Action: [s3:ListBucket, s3:ListBucketVersions]
                 Resource: !GetAtt ContentBucket.Arn
               - Sid: ReadContent
                 Effect: Allow
