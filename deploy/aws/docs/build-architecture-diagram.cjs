@@ -148,7 +148,7 @@ generic(
   170,
   190,
   120,
-  ['Google Gemini API', 'External AI model', 'gemini-3.8-flash · outside AWS'],
+  ['Google Gemini API', 'External AI model', 'gemini-3.5-flash-lite · outside AWS'],
   '<path d="M28 6c2 12 8 18 22 22-14 4-20 10-22 22-2-12-8-18-22-22 14-4 20-10 22-22z"/>',
 );
 generic(
@@ -212,7 +212,7 @@ group(398, 212, 384, 318, {
 });
 group(410, 240, 360, 278, {
   color: C.compute,
-  title: 'EC2 t3.medium · AL2023 · Docker · IMDSv2',
+  title: 'EC2 t3.small · AL2023 · Docker · IMDSv2',
   tag: C.compute,
   tagGlyph: 'ec2',
 });

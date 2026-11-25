@@ -26,7 +26,7 @@ if [ "${1:-}" != "--rotate-gemini" ]; then
   put_if_missing "$P/JWT_REFRESH_SECRET" "$(openssl rand -hex 32)"
   # Non-secret settings (String). ALLOW_REGISTRATION starts true so you can create the
   # invented test accounts; set it to false afterwards and redeploy.
-  exists "$P/GOOGLE_MODELS" || put "$P/GOOGLE_MODELS" "${GOOGLE_MODELS:-gemini-3.8-flash}" String
+  exists "$P/GOOGLE_MODELS" || put "$P/GOOGLE_MODELS" "${GOOGLE_MODELS:-gemini-3.5-flash-lite}" String
   exists "$P/ALLOW_REGISTRATION" || put "$P/ALLOW_REGISTRATION" true String
   exists "$P/APP_TITLE" || put "$P/APP_TITLE" Filmatch String
 fi
