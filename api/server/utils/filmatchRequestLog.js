@@ -33,6 +33,24 @@ function answerLength(response) {
 }
 
 /**
+ * Upstream model failures (429, 503, broken stream) do not throw here: the agent client
+ * appends a `{ type: 'error', error: <message> }` content part to the response instead.
+ * Returns that message, or null when the answer has no error part.
+ */
+function upstreamError(response) {
+  if (!response) {
+    return null;
+  }
+  if (Array.isArray(response.content)) {
+    const part = response.content.find((p) => p?.type === 'error');
+    if (part) {
+      return String(part.error || 'upstream model error');
+    }
+  }
+  return response.error === true ? 'upstream model error' : null;
+}
+
+/**
  * @param {object} params
  * @param {import('express').Request} params.req
  * @param {number} params.startedAt - Date.now() when generation started
@@ -44,7 +62,14 @@ function logFilmatchChat({ req, startedAt, outcome, response, error }) {
   try {
     const question = typeof req?.body?.text === 'string' ? req.body.text : '';
     const answerChars = answerLength(response);
-    const finalOutcome = outcome === 'success' && answerChars === 0 ? 'empty' : outcome;
+    const modelError = outcome === 'success' ? upstreamError(response) : null;
+    let finalOutcome = outcome;
+    if (modelError) {
+      // Counts as failed even if part of the answer streamed before the error.
+      finalOutcome = 'failed';
+    } else if (outcome === 'success' && answerChars === 0) {
+      finalOutcome = 'empty';
+    }
     const endpointOption = req?.body?.endpointOption ?? {};
     const line = {
       event: 'filmatch_chat',
@@ -61,7 +86,7 @@ function logFilmatchChat({ req, startedAt, outcome, response, error }) {
       model: endpointOption.model_parameters?.model ?? req?.body?.model ?? null,
       spec: req?.body?.spec ?? endpointOption.spec ?? null,
       version,
-      error: error ? String(error.message || error).slice(0, 300) : undefined,
+      error: (error ? String(error.message || error) : modelError)?.slice(0, 300) ?? undefined,
     };
     process.stdout.write(JSON.stringify(line) + '\n');
   } catch {
