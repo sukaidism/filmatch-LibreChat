@@ -1,0 +1,234 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Filmatch (SAM10) account baseline - WS-D security. Operators group with enforced MFA,
+  an MFA-only admin role to switch into, CloudTrail audit trail, optional GuardDuty, and an
+  AWS Budgets cost alert. Deploy ONCE per account, before the application stack.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: filmatch
+    AllowedPattern: '^[a-z][a-z0-9-]{2,20}$'
+  AlertEmail:
+    Type: String
+    Description: Real inbox that receives budget alerts.
+    AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  MonthlyBudgetUSD:
+    Type: Number
+    Default: 25
+    MinValue: 1
+    Description: Monthly cost budget. Alerts at 50%, 80%, 100% actual and 100% forecast.
+  CreateCloudTrail:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Set false only if the account already has a multi-region trail.
+  EnableGuardDuty:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: >
+      WS-D stretch item. 30-day free trial, then billed. Set false if a detector already exists
+      in this region (only one detector per region is allowed).
+
+Conditions:
+  DoTrail: !Equals [!Ref CreateCloudTrail, 'true']
+  DoGuardDuty: !Equals [!Ref EnableGuardDuty, 'true']
+
+Resources:
+  # ---------------------------------------------------------------- IAM: people
+  # Each team member gets their OWN IAM user (created by hand, see README) and is added to
+  # this group. Until they register an MFA device they can do nothing except set up MFA.
+  OperatorsGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub '${ProjectName}-operators'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+      Policies:
+        - PolicyName: manage-own-credentials-and-mfa
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: AllowViewAccountInfo
+                Effect: Allow
+                Action: [iam:GetAccountPasswordPolicy, iam:ListVirtualMFADevices]
+                Resource: '*'
+              - Sid: AllowManageOwnPasswordsAndKeys
+                Effect: Allow
+                Action:
+                  - iam:ChangePassword
+                  - iam:GetUser
+                  - iam:GetLoginProfile
+                  - iam:UpdateLoginProfile
+                  - iam:ListAccessKeys
+                  - iam:CreateAccessKey
+                  - iam:UpdateAccessKey
+                  - iam:DeleteAccessKey
+                  - iam:ListSigningCertificates
+                  - iam:ListSSHPublicKeys
+                Resource: 'arn:aws:iam::*:user/${aws:username}'
+              - Sid: AllowManageOwnMFA
+                Effect: Allow
+                Action:
+                  - iam:CreateVirtualMFADevice
+                  - iam:DeleteVirtualMFADevice
+                  - iam:EnableMFADevice
+                  - iam:ResyncMFADevice
+                  - iam:ListMFADevices
+                  - iam:DeactivateMFADevice
+                Resource:
+                  - 'arn:aws:iam::*:mfa/*'
+                  - 'arn:aws:iam::*:user/${aws:username}'
+        - PolicyName: deny-everything-without-mfa
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: BlockMostAccessUnlessSignedInWithMFA
+                Effect: Deny
+                NotAction:
+                  - iam:CreateVirtualMFADevice
+                  - iam:EnableMFADevice
+                  - iam:GetUser
+                  - iam:ListMFADevices
+                  - iam:ListVirtualMFADevices
+                  - iam:ResyncMFADevice
+                  - iam:ChangePassword
+                  - iam:GetAccountPasswordPolicy
+                  - sts:GetSessionToken
+                Resource: '*'
+                Condition:
+                  BoolIfExists:
+                    aws:MultiFactorAuthPresent: 'false'
+        - PolicyName: switch-into-admin-role
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sts:AssumeRole
+                Resource: !GetAtt AdminRole.Arn
+
+  # Nobody holds admin rights permanently: they switch into this role (console "Switch role"
+  # or a CLI profile with mfa_serial) and the session expires after one hour.
+  AdminRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-admin'
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: sts:AssumeRole
+            Condition:
+              Bool:
+                aws:MultiFactorAuthPresent: 'true'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  # ---------------------------------------------------------------- CloudTrail
+  TrailBucket:
+    Type: AWS::S3::Bucket
+    Condition: DoTrail
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${ProjectName}-cloudtrail-${AWS::AccountId}-${AWS::Region}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-trail-logs
+            Status: Enabled
+            ExpirationInDays: 90
+
+  TrailBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: DoTrail
+    Properties:
+      Bucket: !Ref TrailBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AWSCloudTrailAclCheck
+            Effect: Allow
+            Principal: {Service: cloudtrail.amazonaws.com}
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt TrailBucket.Arn
+          - Sid: AWSCloudTrailWrite
+            Effect: Allow
+            Principal: {Service: cloudtrail.amazonaws.com}
+            Action: s3:PutObject
+            Resource: !Sub '${TrailBucket.Arn}/AWSLogs/${AWS::AccountId}/*'
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: [!GetAtt TrailBucket.Arn, !Sub '${TrailBucket.Arn}/*']
+            Condition:
+              Bool: {aws:SecureTransport: 'false'}
+
+  Trail:
+    Type: AWS::CloudTrail::Trail
+    Condition: DoTrail
+    DependsOn: TrailBucketPolicy
+    Properties:
+      TrailName: !Sub '${ProjectName}-trail'
+      S3BucketName: !Ref TrailBucket
+      IsLogging: true
+      IsMultiRegionTrail: true
+      IncludeGlobalServiceEvents: true
+      EnableLogFileValidation: true
+
+  # ---------------------------------------------------------------- GuardDuty (stretch)
+  GuardDutyDetector:
+    Type: AWS::GuardDuty::Detector
+    Condition: DoGuardDuty
+    Properties:
+      Enable: true
+      FindingPublishingFrequency: SIX_HOURS
+
+  # ---------------------------------------------------------------- Cost
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub '${ProjectName}-monthly'
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUSD
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 50, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: EMAIL, Address: !Ref AlertEmail}]
+        - Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 80, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: EMAIL, Address: !Ref AlertEmail}]
+        - Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: EMAIL, Address: !Ref AlertEmail}]
+        - Notification: {NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: EMAIL, Address: !Ref AlertEmail}]
+
+Outputs:
+  OperatorsGroupName:
+    Value: !Ref OperatorsGroup
+    Description: Add every team member's IAM user to this group.
+  AdminRoleArn:
+    Value: !GetAtt AdminRole.Arn
+    Description: Switch into this role (MFA required) for admin work.
+  SwitchRoleUrl:
+    Value: !Sub 'https://signin.aws.amazon.com/switchrole?account=${AWS::AccountId}&roleName=${AdminRole}&displayName=${ProjectName}-admin'
+  TrailBucketName:
+    Condition: DoTrail
+    Value: !Ref TrailBucket

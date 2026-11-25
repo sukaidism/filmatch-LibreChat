@@ -1,0 +1,1068 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Filmatch (SAM10) application stack. One EC2 instance running the reskinned LibreChat and
+  MongoDB in Docker, served over HTTPS by CloudFront. Includes monitoring (WS-B), backups (WS-C),
+  security controls (WS-D), automations (WS-E) and the CI/CD deploy role.
+  Region-agnostic; the team uses ap-southeast-2.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: filmatch
+    AllowedPattern: '^[a-z][a-z0-9-]{2,20}$'
+    Description: Prefix for resource names and the SSM parameter path (/<ProjectName>/...).
+  AlertEmail:
+    Type: String
+    AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+    Description: Real inbox that receives every alarm (confirm the SNS email after deploy).
+  InstanceType:
+    Type: String
+    Default: t3.medium
+    AllowedValues: [t3.small, t3.medium, t3.large]
+    Description: t3.medium (4 GiB) leaves headroom for LibreChat + MongoDB + a restore test.
+  RootVolumeGiB:
+    Type: Number
+    Default: 30
+    MinValue: 20
+    MaxValue: 100
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+  CloudFrontPrefixListId:
+    Type: String
+    AllowedPattern: '^pl-[0-9a-f]+$'
+    Description: >
+      Managed prefix list com.amazonaws.global.cloudfront.origin-facing for this region.
+      deploy-stack.sh looks it up for you.
+  GitHubRepo:
+    Type: String
+    Default: ''
+    Description: owner/repo allowed to deploy from its main branch via OIDC. Empty = no CI role.
+  CreateGitHubOidcProvider:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Set false if token.actions.githubusercontent.com already exists in this account.
+  EnableEbsBackup:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Daily AWS Backup snapshot of the instance (7-day retention) on top of mongodump.
+  BackupRetentionDays:
+    Type: Number
+    Default: 14
+    MinValue: 7
+    Description: How long nightly MongoDB dumps are kept in S3 (brief requires >= 7).
+  LogRetentionDays:
+    Type: Number
+    Default: 30
+    AllowedValues: [7, 14, 30, 60, 90]
+
+Conditions:
+  IsUsEast1: !Equals [!Ref 'AWS::Region', us-east-1]
+  HasGitHub: !Not [!Equals [!Ref GitHubRepo, '']]
+  MakeOidc: !And [!Condition HasGitHub, !Equals [!Ref CreateGitHubOidcProvider, 'true']]
+  DoEbsBackup: !Equals [!Ref EnableEbsBackup, 'true']
+
+Resources:
+  # =====================================================================================
+  # Network: one VPC, one public subnet. No SSH; admin access is SSM Session Manager.
+  # =====================================================================================
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.20.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags: [{Key: Name, Value: !Sub '${ProjectName}-vpc'}]
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: {VpcId: !Ref Vpc, InternetGatewayId: !Ref InternetGateway}
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.20.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: false
+      Tags: [{Key: Name, Value: !Sub '${ProjectName}-public-a'}]
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: {VpcId: !Ref Vpc}
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  SubnetRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref PublicSubnet, RouteTableId: !Ref PublicRouteTable}
+
+  # Only CloudFront can reach the instance, and only on port 80. MongoDB has no port at all.
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Filmatch app - HTTP from CloudFront origin-facing IPs only. No SSH.
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourcePrefixListId: !Ref CloudFrontPrefixListId
+          Description: CloudFront to LibreChat
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS out (Gemini API, ECR, S3, SSM, CloudWatch)
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP out (OS package mirrors)
+        - IpProtocol: udp
+          FromPort: 123
+          ToPort: 123
+          CidrIp: 0.0.0.0/0
+          Description: NTP
+      Tags: [{Key: Name, Value: !Sub '${ProjectName}-app-sg'}]
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags: [{Key: Name, Value: !Sub '${ProjectName}-eip'}]
+
+  # =====================================================================================
+  # Storage: content bucket (knowledge docs, config, deploy bundle) and backup bucket.
+  # =====================================================================================
+  ContentBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${ProjectName}-content-${AWS::AccountId}-${AWS::Region}'
+      VersioningConfiguration: {Status: Enabled}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ObjectOwnership: BucketOwnerEnforced}]
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-versions
+            Status: Enabled
+            NoncurrentVersionExpiration: {NoncurrentDays: 90}
+
+  ContentBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ContentBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: [!GetAtt ContentBucket.Arn, !Sub '${ContentBucket.Arn}/*']
+            Condition: {Bool: {aws:SecureTransport: 'false'}}
+
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${ProjectName}-backups-${AWS::AccountId}-${AWS::Region}'
+      VersioningConfiguration: {Status: Enabled}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ObjectOwnership: BucketOwnerEnforced}]
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-mongodb-dumps
+            Status: Enabled
+            Prefix: mongodb/
+            ExpirationInDays: !Ref BackupRetentionDays
+            NoncurrentVersionExpiration: {NoncurrentDays: 7}
+          - Id: expire-config-snapshots
+            Status: Enabled
+            Prefix: config/
+            ExpirationInDays: !Ref BackupRetentionDays
+            NoncurrentVersionExpiration: {NoncurrentDays: 7}
+          - Id: expire-automation-output
+            Status: Enabled
+            Prefix: ssm-output/
+            ExpirationInDays: 30
+
+  BackupBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BackupBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: [!GetAtt BackupBucket.Arn, !Sub '${BackupBucket.Arn}/*']
+            Condition: {Bool: {aws:SecureTransport: 'false'}}
+
+  # =====================================================================================
+  # Container registry
+  # =====================================================================================
+  AppRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub '${ProjectName}-app'
+      ImageScanningConfiguration: {ScanOnPush: true}
+      ImageTagMutability: MUTABLE
+      EncryptionConfiguration: {EncryptionType: AES256}
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"keep last 10 images",
+            "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":10},
+            "action":{"type":"expire"}}]}
+
+  # =====================================================================================
+  # Non-secret runtime parameters (secrets are SecureStrings created by put-secrets.sh,
+  # because CloudFormation cannot create SecureString parameters).
+  # =====================================================================================
+  ImageTagParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub '/${ProjectName}/app/image-tag'
+      Type: String
+      Value: latest
+      Description: Image tag deploy.sh runs. CI overwrites it with the commit SHA.
+
+  DomainParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub '/${ProjectName}/app/domain'
+      Type: String
+      Value: !GetAtt Distribution.DomainName
+      Description: Public HTTPS hostname (CloudFront).
+
+  # =====================================================================================
+  # IAM: instance role (least privilege, no access keys anywhere)
+  # =====================================================================================
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-ec2-role-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies:
+        - PolicyName: filmatch-runtime
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadOwnParameters
+                Effect: Allow
+                Action: [ssm:GetParametersByPath, ssm:GetParameter, ssm:GetParameters]
+                Resource:
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ProjectName}/app-env'
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ProjectName}/app-env/*'
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ProjectName}/app/*'
+              - Sid: PullAppImage
+                Effect: Allow
+                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability]
+                Resource: !GetAtt AppRepository.Arn
+              - Sid: EcrLogin
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Sid: ListContent
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt ContentBucket.Arn
+              - Sid: ReadContent
+                Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - !Sub '${ContentBucket.Arn}/knowledge/*'
+                  - !Sub '${ContentBucket.Arn}/config/*'
+                  - !Sub '${ContentBucket.Arn}/deploy/*'
+              - Sid: ListBackups
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt BackupBucket.Arn
+              - Sid: WriteAndReadBackups
+                Effect: Allow
+                Action: [s3:PutObject, s3:GetObject]
+                Resource:
+                  - !Sub '${BackupBucket.Arn}/mongodb/*'
+                  - !Sub '${BackupBucket.Arn}/config/*'
+                  - !Sub '${BackupBucket.Arn}/ssm-output/*'
+              - Sid: PublishCustomMetrics
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: '*'
+                Condition:
+                  StringLike:
+                    cloudwatch:namespace: ['Filmatch/*', 'CWAgent']
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  # =====================================================================================
+  # Compute
+  # =====================================================================================
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub '${ProjectName}-app'
+      LaunchTemplateData:
+        ImageId: !Ref LatestAmiId
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile: {Arn: !GetAtt InstanceProfile.Arn}
+        # IMDSv2 only, hop limit 1: containers cannot borrow the instance role.
+        MetadataOptions:
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
+          HttpEndpoint: enabled
+        Monitoring: {Enabled: false}
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: !Ref RootVolumeGiB
+              VolumeType: gp3
+              Encrypted: true
+              DeleteOnTermination: true
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            SubnetId: !Ref PublicSubnet
+            Groups: [!Ref AppSecurityGroup]
+            AssociatePublicIpAddress: false
+        TagSpecifications:
+          - ResourceType: volume
+            Tags: [{Key: Name, Value: !Sub '${ProjectName}-root'}]
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            # Filmatch first-boot bootstrap. Installs Docker + CloudWatch agent, then hands over
+            # to deploy/aws/scripts/deploy.sh (pulled from S3) which starts the containers.
+            set -uxo pipefail
+            exec > >(tee -a /var/log/filmatch-bootstrap.log) 2>&1
+
+            # No auto public IP: internet access starts when the Elastic IP is attached. Wait for it.
+            for i in $(seq 1 120); do
+              tok=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')
+              ip=$(curl -s -H "X-aws-ec2-metadata-token: $tok" http://169.254.169.254/latest/meta-data/public-ipv4 || true)
+              [ "$ip" = "${ElasticIp}" ] && break
+              sleep 5
+            done
+
+            for i in 1 2 3 4 5; do dnf install -y docker amazon-cloudwatch-agent jq logrotate && break; sleep 15; done
+            systemctl enable --now docker
+            mkdir -p /usr/local/lib/docker/cli-plugins
+            curl -fsSL "https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64" \
+              -o /usr/local/lib/docker/cli-plugins/docker-compose
+            chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+            # 2 GiB swap so a memory spike degrades instead of OOM-killing node.
+            if [ ! -f /swapfile ]; then
+              dd if=/dev/zero of=/swapfile bs=1M count=2048 && chmod 600 /swapfile
+              mkswap /swapfile && swapon /swapfile && echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+            fi
+
+            # Non-secret settings only. Secrets stay in Parameter Store until deploy time.
+            cat > /etc/filmatch.env <<'EOF'
+            AWS_REGION=${AWS::Region}
+            AWS_DEFAULT_REGION=${AWS::Region}
+            PROJECT_NAME=${ProjectName}
+            SSM_PREFIX=/${ProjectName}
+            CONTENT_BUCKET=${ContentBucket}
+            BACKUP_BUCKET=${BackupBucket}
+            ECR_REPOSITORY_URI=${AppRepository.RepositoryUri}
+            ECR_REGISTRY=${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com
+            APP_LOG_GROUP=/${ProjectName}/app
+            DB_LOG_GROUP=/${ProjectName}/mongodb
+            EOF
+            sed -i 's/^ *//' /etc/filmatch.env
+            chmod 644 /etc/filmatch.env
+
+            mkdir -p /opt/filmatch/{deploy,config,data-node,logs,uploads,images,backup}
+            chown -R 1000:1000 /opt/filmatch/config /opt/filmatch/logs /opt/filmatch/uploads /opt/filmatch/images
+            chown -R 999:999 /opt/filmatch/data-node
+
+            # CloudWatch agent: memory and root-disk usage (EC2 does not publish these itself).
+            cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'EOF'
+            {
+              "agent": {"metrics_collection_interval": 60},
+              "metrics": {
+                "namespace": "Filmatch/Host",
+                "append_dimensions": {"InstanceId": "${!aws:InstanceId}"},
+                "aggregation_dimensions": [["InstanceId"]],
+                "metrics_collected": {
+                  "mem": {"measurement": ["mem_used_percent"]},
+                  "disk": {"measurement": ["used_percent"], "resources": ["/"], "drop_device": true},
+                  "swap": {"measurement": ["swap_used_percent"]}
+                }
+              }
+            }
+            EOF
+            /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 \
+              -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+
+            # First deploy, if CI has already uploaded the bundle and an image.
+            aws s3 sync "s3://${ContentBucket}/deploy/" /opt/filmatch/deploy/ --region ${AWS::Region} || true
+            if [ -f /opt/filmatch/deploy/scripts/deploy.sh ]; then
+              bash /opt/filmatch/deploy/scripts/deploy.sh || echo "first deploy failed - run deploy via SSM"
+            fi
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      Tags:
+        - {Key: Name, Value: !Sub '${ProjectName}-app'}
+        - {Key: FilmatchRole, Value: app}
+        - {Key: Backup, Value: !Sub '${ProjectName}-daily'}
+
+  EipAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt ElasticIp.AllocationId
+      InstanceId: !Ref Instance
+
+  # =====================================================================================
+  # HTTPS: CloudFront with its default *.cloudfront.net certificate (free TLS, no domain).
+  # =====================================================================================
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub '${ProjectName} HTTPS front door'
+        HttpVersion: http2and3
+        PriceClass: PriceClass_200
+        Origins:
+          - Id: ec2-origin
+            DomainName: !If
+              - IsUsEast1
+              - !Sub
+                - 'ec2-${Dashed}.compute-1.amazonaws.com'
+                - Dashed: !Join ['-', !Split ['.', !Ref ElasticIp]]
+              - !Sub
+                - 'ec2-${Dashed}.${AWS::Region}.compute.amazonaws.com'
+                - Dashed: !Join ['-', !Split ['.', !Ref ElasticIp]]
+            CustomOriginConfig:
+              HTTPPort: 80
+              OriginProtocolPolicy: http-only
+              OriginReadTimeout: 60
+              OriginKeepaliveTimeout: 60
+        DefaultCacheBehavior:
+          TargetOriginId: ec2-origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+          CachedMethods: [GET, HEAD]
+          # Managed policies: CachingDisabled + AllViewerExceptHostHeader (chat is dynamic).
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+
+  # =====================================================================================
+  # Logs (WS-B #4): retention set, never "Never expire".
+  # =====================================================================================
+  AppLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/${ProjectName}/app'
+      RetentionInDays: !Ref LogRetentionDays
+  DbLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/${ProjectName}/mongodb'
+      RetentionInDays: !Ref LogRetentionDays
+  HealthCheckLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-healthcheck'
+      RetentionInDays: !Ref LogRetentionDays
+
+  # One JSON line per chat answer (api/server/utils/filmatchRequestLog.js) -> metrics.
+  MfRequests:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.event = "filmatch_chat" }'
+      MetricTransformations:
+        - {MetricNamespace: Filmatch/App, MetricName: Requests, MetricValue: '1', DefaultValue: 0, Unit: Count}
+  MfSucceeded:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.event = "filmatch_chat" && $.success = 1 }'
+      MetricTransformations:
+        - {MetricNamespace: Filmatch/App, MetricName: AnswersSucceeded, MetricValue: '1', DefaultValue: 0, Unit: Count}
+  MfFailed:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.event = "filmatch_chat" && $.failed = 1 }'
+      MetricTransformations:
+        - {MetricNamespace: Filmatch/App, MetricName: AnswersFailed, MetricValue: '1', DefaultValue: 0, Unit: Count}
+  MfEmpty:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.event = "filmatch_chat" && $.empty = 1 }'
+      MetricTransformations:
+        - {MetricNamespace: Filmatch/App, MetricName: EmptyAnswers, MetricValue: '1', DefaultValue: 0, Unit: Count}
+  MfResponseTime:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.event = "filmatch_chat" && $.outcome = "success" }'
+      MetricTransformations:
+        - {MetricNamespace: Filmatch/App, MetricName: ResponseTimeMs, MetricValue: '$.durationMs', Unit: Milliseconds}
+  MfAppErrors:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.level = "error" }'
+      MetricTransformations:
+        - {MetricNamespace: Filmatch/App, MetricName: AppErrors, MetricValue: '1', DefaultValue: 0, Unit: Count}
+
+  # =====================================================================================
+  # Alerting
+  # =====================================================================================
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${ProjectName}-alerts'
+      DisplayName: Filmatch Alerts
+      Subscription:
+        - {Protocol: email, Endpoint: !Ref AlertEmail}
+
+  AlarmHighCpu:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-high-cpu'
+      AlarmDescription: CPU above 85% for 10 minutes - look for a stuck process or runaway loop.
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 85
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: missing
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  AlarmStatusCheck:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-status-check-failed'
+      AlarmDescription: EC2 instance or system status check failed - look at the instance.
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  AlarmDiskHigh:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-disk-used-high'
+      AlarmDescription: Root disk above 85% used - clean up logs/images or grow the volume (see disk-full runbook).
+      Namespace: Filmatch/Host
+      MetricName: disk_used_percent
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 85
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: missing
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  AlarmMemoryHigh:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-memory-high'
+      AlarmDescription: Memory above 90% for 5 minutes - node or mongod may be OOM-killed soon.
+      Namespace: Filmatch/Host
+      MetricName: mem_used_percent
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 90
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: missing
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  AlarmAnswersFailedRate:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-answers-failed-rate'
+      AlarmDescription: More than 5% of chat answers failed in 15 minutes - the system is up but not working (check Gemini key, quota, 429s).
+      Metrics:
+        - Id: failed
+          ReturnData: false
+          MetricStat:
+            Metric: {Namespace: Filmatch/App, MetricName: AnswersFailed}
+            Period: 900
+            Stat: Sum
+        - Id: total
+          ReturnData: false
+          MetricStat:
+            Metric: {Namespace: Filmatch/App, MetricName: Requests}
+            Period: 900
+            Stat: Sum
+        - Id: rate
+          Label: Failed answer %
+          Expression: 'IF(total > 0, 100 * failed / total, 0)'
+          ReturnData: true
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  AlarmEmptyAnswers:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-empty-answers'
+      AlarmDescription: An answer came back empty in the last 30 minutes - knowledge/config may be missing or unreadable.
+      Namespace: Filmatch/App
+      MetricName: EmptyAnswers
+      Statistic: Sum
+      Period: 1800
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  AlarmSlowAnswers:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-slow-answers'
+      AlarmDescription: Average full-answer time above 15 s over 5 minutes - the assistant is too slow for a customer at the counter.
+      Namespace: Filmatch/App
+      MetricName: ResponseTimeMs
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 15000
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  AlarmAppErrors:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-app-errors'
+      AlarmDescription: 10 or more application error log lines in 5 minutes.
+      Namespace: Filmatch/App
+      MetricName: AppErrors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  AlarmHealthCheck:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-healthcheck-failed'
+      AlarmDescription: The public HTTPS health check failed twice in a row (10 minutes) - users cannot reach Filmatch.
+      Namespace: Filmatch/Health
+      MetricName: HealthCheckOk
+      Statistic: Minimum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  AlarmBackupMissing:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-backup-missing'
+      AlarmDescription: No successful nightly MongoDB backup in the last 24 hours.
+      Namespace: Filmatch/Backup
+      MetricName: BackupSuccess
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  # =====================================================================================
+  # Dashboard (WS-B #1)
+  # =====================================================================================
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${ProjectName}-operations'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {"type":"text","x":0,"y":0,"width":24,"height":2,"properties":{"markdown":"## Filmatch operations\nChat metrics come from one structured log line per answer in **/${ProjectName}/app**. Host memory/disk come from the CloudWatch agent. Thresholds: CPU >85% 10 min, disk >85%, memory >90%, failed answers >5% in 15 min, average answer >15 s."}},
+            {"type":"metric","x":0,"y":2,"width":8,"height":6,"properties":{"title":"Chat requests (per 5 min)","region":"${AWS::Region}","stat":"Sum","period":300,"view":"timeSeries",
+              "metrics":[["Filmatch/App","Requests",{"label":"Requests"}]]}},
+            {"type":"metric","x":8,"y":2,"width":8,"height":6,"properties":{"title":"Answers: succeeded / failed / empty","region":"${AWS::Region}","stat":"Sum","period":300,"view":"timeSeries",
+              "metrics":[["Filmatch/App","AnswersSucceeded",{"color":"#2ca02c"}],[".","AnswersFailed",{"color":"#d62728"}],[".","EmptyAnswers",{"color":"#ff7f0e"}],[".","AppErrors",{"color":"#9467bd","label":"App error log lines"}]]}},
+            {"type":"metric","x":16,"y":2,"width":8,"height":6,"properties":{"title":"Answer time (ms)","region":"${AWS::Region}","period":300,"view":"timeSeries",
+              "metrics":[["Filmatch/App","ResponseTimeMs",{"stat":"Average","label":"Average"}],["...",{"stat":"p90","label":"p90"}]],
+              "annotations":{"horizontal":[{"label":"Alarm 15 s","value":15000}]}}},
+            {"type":"metric","x":0,"y":8,"width":8,"height":6,"properties":{"title":"EC2 CPU %","region":"${AWS::Region}","stat":"Average","period":300,
+              "metrics":[["AWS/EC2","CPUUtilization","InstanceId","${Instance}"]],"yAxis":{"left":{"min":0,"max":100}},
+              "annotations":{"horizontal":[{"label":"Alarm 85%","value":85}]}}},
+            {"type":"metric","x":8,"y":8,"width":8,"height":6,"properties":{"title":"Disk used % (root)","region":"${AWS::Region}","stat":"Maximum","period":300,
+              "metrics":[["Filmatch/Host","disk_used_percent","InstanceId","${Instance}"]],"yAxis":{"left":{"min":0,"max":100}},
+              "annotations":{"horizontal":[{"label":"Alarm 85%","value":85}]}}},
+            {"type":"metric","x":16,"y":8,"width":8,"height":6,"properties":{"title":"Memory / swap used %","region":"${AWS::Region}","stat":"Average","period":300,
+              "metrics":[["Filmatch/Host","mem_used_percent","InstanceId","${Instance}"],[".","swap_used_percent",".","."]],"yAxis":{"left":{"min":0,"max":100}},
+              "annotations":{"horizontal":[{"label":"Alarm 90%","value":90}]}}},
+            {"type":"metric","x":0,"y":14,"width":8,"height":6,"properties":{"title":"Public health check (every 5 min)","region":"${AWS::Region}","period":300,
+              "metrics":[["Filmatch/Health","HealthCheckOk",{"stat":"Minimum","label":"OK (1 = up)"}],[".","HealthCheckLatencyMs",{"stat":"Average","yAxis":"right","label":"Latency ms"}]]}},
+            {"type":"metric","x":8,"y":14,"width":8,"height":6,"properties":{"title":"Database: nightly dump size (bytes) and success","region":"${AWS::Region}","period":86400,
+              "metrics":[["Filmatch/Backup","BackupSizeBytes",{"stat":"Maximum","label":"Dump size"}],[".","BackupSuccess",{"stat":"Sum","yAxis":"right","label":"Successful backups"}]]}},
+            {"type":"metric","x":16,"y":14,"width":8,"height":6,"properties":{"title":"Failed answer % (15 min)","region":"${AWS::Region}","period":900,
+              "metrics":[[{"expression":"IF(m2 > 0, 100*m1/m2, 0)","label":"Failed %","id":"e1"}],["Filmatch/App","AnswersFailed",{"id":"m1","stat":"Sum","visible":false}],[".","Requests",{"id":"m2","stat":"Sum","visible":false}]],
+              "annotations":{"horizontal":[{"label":"Alarm 5%","value":5}]}}},
+            {"type":"log","x":0,"y":20,"width":24,"height":7,"properties":{"title":"Latest chat requests (request log)","region":"${AWS::Region}","view":"table",
+              "query":"SOURCE '/${ProjectName}/app' | fields @timestamp, outcome, durationMs, version, model, question | filter event = 'filmatch_chat' | sort @timestamp desc | limit 25"}},
+            {"type":"alarm","x":0,"y":27,"width":24,"height":4,"properties":{"title":"Alarms","alarms":[
+              "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${ProjectName}-high-cpu",
+              "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${ProjectName}-status-check-failed",
+              "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${ProjectName}-disk-used-high",
+              "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${ProjectName}-memory-high",
+              "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${ProjectName}-answers-failed-rate",
+              "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${ProjectName}-empty-answers",
+              "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${ProjectName}-slow-answers",
+              "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${ProjectName}-app-errors",
+              "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${ProjectName}-healthcheck-failed",
+              "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${ProjectName}-backup-missing"]}}
+          ]
+        }
+
+  # =====================================================================================
+  # Automation 1 (WS-E): health check every 5 minutes from outside the instance.
+  # =====================================================================================
+  HealthCheckRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: healthcheck
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub '${HealthCheckLogGroup.Arn}:*'
+              - Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: '*'
+                Condition:
+                  StringEquals: {cloudwatch:namespace: Filmatch/Health}
+
+  HealthCheckFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: HealthCheckLogGroup
+    Properties:
+      FunctionName: !Sub '${ProjectName}-healthcheck'
+      Description: Calls https://<cloudfront>/health and publishes Filmatch/Health metrics.
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 20
+      MemorySize: 128
+      Role: !GetAtt HealthCheckRole.Arn
+      Environment:
+        Variables:
+          HEALTH_URL: !Sub 'https://${Distribution.DomainName}/health'
+      Code:
+        ZipFile: |
+          import json, os, time, urllib.request
+          import boto3
+
+          cw = boto3.client("cloudwatch")
+          URL = os.environ["HEALTH_URL"]
+
+          def handler(event, context):
+              started = time.time()
+              ok, status, error = 0, None, None
+              try:
+                  req = urllib.request.Request(URL, headers={"User-Agent": "filmatch-healthcheck/1.0"})
+                  with urllib.request.urlopen(req, timeout=10) as resp:
+                      status = resp.status
+                      body = resp.read(64).decode("utf-8", "replace").strip()
+                      ok = 1 if status == 200 and body.startswith("OK") else 0
+              except Exception as exc:  # noqa: BLE001 - any failure is a failed check
+                  error = str(exc)[:200]
+              latency_ms = int((time.time() - started) * 1000)
+              cw.put_metric_data(
+                  Namespace="Filmatch/Health",
+                  MetricData=[
+                      {"MetricName": "HealthCheckOk", "Value": ok, "Unit": "Count"},
+                      {"MetricName": "HealthCheckLatencyMs", "Value": latency_ms, "Unit": "Milliseconds"},
+                  ],
+              )
+              print(json.dumps({"event": "filmatch_healthcheck", "ok": ok, "status": status,
+                                "latencyMs": latency_ms, "error": error, "trigger": event.get("source", "manual")}))
+              return {"ok": ok, "status": status, "latencyMs": latency_ms}
+
+  HealthCheckSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${ProjectName}-healthcheck-every-5-min'
+      ScheduleExpression: rate(5 minutes)
+      State: ENABLED
+      Targets:
+        - Id: healthcheck
+          Arn: !GetAtt HealthCheckFunction.Arn
+
+  HealthCheckInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref HealthCheckFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt HealthCheckSchedule.Arn
+
+  # =====================================================================================
+  # Automation 2 (WS-C/WS-E): nightly MongoDB dump to S3 at 02:00 Asia/Manila.
+  # Runs via SSM State Manager - no human, timestamped history in the SSM console + S3.
+  # =====================================================================================
+  NightlyBackupAssociation:
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: !Sub '${ProjectName}-nightly-mongodb-backup'
+      Name: AWS-RunShellScript
+      ScheduleExpression: cron(0 18 * * ? *)
+      ApplyOnlyAtCronInterval: true
+      Targets:
+        - Key: InstanceIds
+          Values: [!Ref Instance]
+      Parameters:
+        commands:
+          - bash /opt/filmatch/deploy/scripts/backup-mongo.sh
+        executionTimeout: ['1800']
+      OutputLocation:
+        S3Location:
+          OutputS3BucketName: !Ref BackupBucket
+          OutputS3KeyPrefix: ssm-output/nightly-backup
+
+  # =====================================================================================
+  # Second backup layer: daily EBS snapshot of the whole instance via AWS Backup.
+  # =====================================================================================
+  BackupVault:
+    Type: AWS::Backup::BackupVault
+    Condition: DoEbsBackup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BackupVaultName: !Sub '${ProjectName}-vault'
+
+  BackupPlan:
+    Type: AWS::Backup::BackupPlan
+    Condition: DoEbsBackup
+    Properties:
+      BackupPlan:
+        BackupPlanName: !Sub '${ProjectName}-daily-ebs'
+        BackupPlanRule:
+          - RuleName: daily-7-days
+            TargetBackupVault: !Ref BackupVault
+            ScheduleExpression: cron(0 19 * * ? *)
+            StartWindowMinutes: 60
+            CompletionWindowMinutes: 180
+            Lifecycle: {DeleteAfterDays: 7}
+
+  BackupServiceRole:
+    Type: AWS::IAM::Role
+    Condition: DoEbsBackup
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: backup.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores
+
+  BackupSelection:
+    Type: AWS::Backup::BackupSelection
+    Condition: DoEbsBackup
+    Properties:
+      BackupPlanId: !Ref BackupPlan
+      BackupSelection:
+        SelectionName: !Sub '${ProjectName}-tagged-instances'
+        IamRoleArn: !GetAtt BackupServiceRole.Arn
+        ListOfTags:
+          - ConditionType: STRINGEQUALS
+            ConditionKey: Backup
+            ConditionValue: !Sub '${ProjectName}-daily'
+
+  # =====================================================================================
+  # CI/CD (WS-E stretch): GitHub Actions on main -> build -> ECR -> SSM deploy. OIDC, no keys.
+  # =====================================================================================
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: MakeOidc
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+  GitHubDeployRole:
+    Type: AWS::IAM::Role
+    Condition: HasGitHub
+    Properties:
+      RoleName: !Sub '${ProjectName}-github-deploy-${AWS::Region}'
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - MakeOidc
+                - !Ref GitHubOidcProvider
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubRepo}:ref:refs/heads/main'
+      Policies:
+        - PolicyName: build-and-deploy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: EcrLogin
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Sid: PushImage
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                Resource: !GetAtt AppRepository.Arn
+              - Sid: UploadBundleAndContent
+                Effect: Allow
+                Action: [s3:PutObject, s3:GetObject]
+                Resource:
+                  - !Sub '${ContentBucket.Arn}/deploy/*'
+                  - !Sub '${ContentBucket.Arn}/knowledge/*'
+                  - !Sub '${ContentBucket.Arn}/config/*'
+              - Sid: ListContentBucket
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt ContentBucket.Arn
+              - Sid: SetImageTag
+                Effect: Allow
+                Action: ssm:PutParameter
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ProjectName}/app/image-tag'
+              - Sid: RunDeployOnAppInstance
+                Effect: Allow
+                Action: ssm:SendCommand
+                Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*'
+                Condition:
+                  StringEquals: {ssm:resourceTag/FilmatchRole: app}
+              - Sid: RunShellDocument
+                Effect: Allow
+                Action: ssm:SendCommand
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}::document/AWS-RunShellScript'
+              - Sid: ReadCommandResult
+                Effect: Allow
+                Action: [ssm:GetCommandInvocation, ssm:ListCommandInvocations, ssm:ListCommands]
+                Resource: '*'
+
+Outputs:
+  AppUrl:
+    Description: Filmatch over HTTPS
+    Value: !Sub 'https://${Distribution.DomainName}'
+  InstanceId:
+    Value: !Ref Instance
+  ElasticIp:
+    Value: !Ref ElasticIp
+  EcrRepositoryUri:
+    Value: !GetAtt AppRepository.RepositoryUri
+  ContentBucketName:
+    Value: !Ref ContentBucket
+  BackupBucketName:
+    Value: !Ref BackupBucket
+  AlertTopicArn:
+    Value: !Ref AlertTopic
+  DashboardUrl:
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${ProjectName}-operations'
+  GitHubDeployRoleArn:
+    Condition: HasGitHub
+    Value: !GetAtt GitHubDeployRole.Arn
+  SessionManagerCommand:
+    Value: !Sub 'aws ssm start-session --target ${Instance} --region ${AWS::Region}'

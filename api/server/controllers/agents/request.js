@@ -1,5 +1,6 @@
 const { logger, tenantStorage, createChatExpirationDate } = require('@librechat/data-schemas');
 const { v5: uuidv5 } = require('uuid');
+const { logFilmatchChat } = require('~/server/utils/filmatchRequestLog');
 const {
   Constants,
   EModelEndpoint,
@@ -2298,7 +2299,11 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
 
     // Start background generation immediately. The stream layer buffers and persists events
     // until an SSE subscriber attaches, so generation no longer waits on subscriber readiness.
+    /** Filmatch ops logging (WS-B): one structured line per answer. */
+    let filmatchStartedAt = Date.now();
+    let filmatchLogged = false;
     const startGeneration = async () => {
+      filmatchStartedAt = Date.now();
       /** Immediate-mode title generation runs in parallel with the response, so
        *  the conversation row may not exist when the title resolves. `convoReady`
        *  resolves once that row is known to exist — normally the user-message
@@ -3278,6 +3283,15 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
             },
           );
 
+          if (!filmatchLogged) {
+            filmatchLogged = true;
+            logFilmatchChat({
+              req,
+              startedAt: filmatchStartedAt,
+              outcome: terminalWasAborted ? 'aborted' : 'success',
+              response,
+            });
+          }
           terminalPublicationStarted = true;
           logAgentMemorySnapshot('before_final_publish', terminalMemoryContext);
           const publication = await GenerationJobManager.publishTerminalClaim(
@@ -3350,6 +3364,18 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           }
         }
       } catch (error) {
+        if (!filmatchLogged) {
+          filmatchLogged = true;
+          logFilmatchChat({
+            req,
+            startedAt: filmatchStartedAt,
+            outcome:
+              job.abortController.signal.aborted || error?.message?.includes('abort')
+                ? 'aborted'
+                : 'failed',
+            error,
+          });
+        }
         // Any failure (user Stop, or a preflight/quota failure before the run is
         // even created) must cancel the title and unblock its waits: the title's
         // `_waitForRun` would otherwise never resolve, deferring client disposal
@@ -3496,6 +3522,10 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
         logger.error(
           `[ResumableAgentController] Unhandled error in background generation: ${err.message}`,
         );
+        if (!filmatchLogged) {
+          filmatchLogged = true;
+          logFilmatchChat({ req, startedAt: filmatchStartedAt, outcome: 'failed', error: err });
+        }
         startupTelemetry?.end('error', err);
         if (!res.headersSent) {
           sendGenerationJson(

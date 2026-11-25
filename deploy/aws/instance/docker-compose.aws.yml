@@ -1,0 +1,82 @@
+# Filmatch production stack on EC2. Started by scripts/deploy.sh - do not run by hand without
+# first loading the environment (deploy.sh exports secrets from Parameter Store into the shell;
+# nothing secret is written to disk or to this file).
+#
+# Compared with the upstream docker-compose.yml we drop meilisearch, rag_api, vectordb and
+# admin-panel: Filmatch does not use search or file RAG, so they would only cost memory.
+
+name: filmatch
+
+services:
+  api:
+    image: ${FILMATCH_IMAGE:?FILMATCH_IMAGE not set - run scripts/deploy.sh}
+    container_name: filmatch-api
+    restart: always
+    depends_on: [mongodb]
+    ports:
+      - '80:3080' # reachable only from CloudFront (security group prefix list)
+    environment:
+      HOST: 0.0.0.0
+      PORT: '3080'
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=1536
+      MONGO_URI: mongodb://mongodb:27017/LibreChat
+      CONFIG_PATH: /config/librechat.filmatch.yaml
+      DOMAIN_CLIENT: https://${APP_DOMAIN:?}
+      DOMAIN_SERVER: https://${APP_DOMAIN:?}
+      TRUST_PROXY: '1'
+      NO_INDEX: 'true'
+      CONSOLE_JSON: 'true' # JSON stdout -> CloudWatch metric filters
+      DEBUG_LOGGING: ${DEBUG_LOGGING:-false}
+      LOG_TO_FILE: 'true'
+      SEARCH: 'false'
+      APP_TITLE: ${APP_TITLE:-Filmatch}
+      ALLOW_EMAIL_LOGIN: 'true'
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+      ALLOW_SOCIAL_LOGIN: 'false'
+      ALLOW_SOCIAL_REGISTRATION: 'false'
+      ALLOW_PASSWORD_RESET: 'false'
+      ALLOW_UNVERIFIED_EMAIL_LOGIN: 'true'
+      ALLOW_SHARED_LINKS: 'false'
+      LIMIT_CONCURRENT_MESSAGES: 'true'
+      CONCURRENT_MESSAGE_MAX: '2'
+      LIMIT_MESSAGE_IP: 'true'
+      MESSAGE_IP_MAX: '40'
+      MESSAGE_IP_WINDOW: '1'
+      # Secrets: passed through from the deploy shell (Parameter Store SecureStrings).
+      GOOGLE_KEY: ${GOOGLE_KEY:?GOOGLE_KEY missing in Parameter Store}
+      GOOGLE_MODELS: ${GOOGLE_MODELS:-}
+      CREDS_KEY: ${CREDS_KEY:?}
+      CREDS_IV: ${CREDS_IV:?}
+      JWT_SECRET: ${JWT_SECRET:?}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?}
+    volumes:
+      - /opt/filmatch/config:/config:ro
+      - /opt/filmatch/logs:/app/logs
+      - /opt/filmatch/uploads:/app/uploads
+      - /opt/filmatch/images:/app/client/public/images
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: ${APP_LOG_GROUP:-/filmatch/app}
+        awslogs-stream: filmatch-api
+        mode: non-blocking
+        max-buffer-size: 4m
+
+  mongodb:
+    image: mongo:8.0.20
+    container_name: filmatch-mongodb
+    restart: always
+    # No published port: only the api container on this Docker network can reach it.
+    command: mongod --noauth --bind_ip_all
+    volumes:
+      - /opt/filmatch/data-node:/data/db
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: ${DB_LOG_GROUP:-/filmatch/mongodb}
+        awslogs-stream: filmatch-mongodb
+        mode: non-blocking
+        max-buffer-size: 4m
