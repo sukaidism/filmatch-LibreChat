@@ -35,7 +35,8 @@ aws s3api list-object-versions --bucket "$CONTENT_BUCKET" --prefix knowledge/ \
   log "could not list S3 object versions (continuing)"
 
 staging=$FILMATCH_ROOT/config/staging
-mkdir -p "$staging"
+# The refresh runs as uid 1000 and writes a temp file + rename, so it must own the directory.
+install -d -o 1000 -g 1000 -m 755 "$staging"
 install -o 1000 -g 1000 -m 644 "$stage/librechat.filmatch.yaml" "$staging/librechat.filmatch.yaml"
 chmod -R a+rX "$stage"
 docker run --rm --user 1000:1000 --network none \
